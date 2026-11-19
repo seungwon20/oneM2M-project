@@ -224,7 +224,7 @@ function renderMnDevices(payload){
   const grid=$('mn-device-grid');
   if(!payload || !payload.configured){
     status.textContent='설정 필요';status.classList.remove('online');
-    grid.textContent='MN-CSE 주소가 설정되지 않았습니다. FastAPI 실행 환경에 PG_MN_CSE_URL을 지정하세요.';
+    grid.textContent='IN-CSE 경유 설정이 필요합니다. PG_IN_CSE_URL, PG_MN_CSE_ID, PG_IN_CSE_ORIGIN을 설정하세요.';
     $('mn-cse-footnote').textContent='현재 대시보드의 기존 센서·Risk level 데이터에는 영향을 주지 않습니다.';
     return;
   }

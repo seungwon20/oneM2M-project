@@ -99,6 +99,9 @@ def test_validate_settings_checks_runtime_url_and_seed_mapping(tmp_path):
     }
     settings["AE_ID"] = "test-originator"
     settings["TINYIOT_SERVER_IP"] = "127.0.0.1"
+    settings["REMOTE_CSE_ID"] = "/test-in"
+    settings["REMOTE_CSE_NAME"] = "TestIN"
+    settings["REMOTE_CSE_HOST"] = "monitoring.test"
 
     validate_settings(root, settings)
 

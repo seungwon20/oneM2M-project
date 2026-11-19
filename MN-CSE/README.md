@@ -1,60 +1,53 @@
 # TinyIoT MN-CSE
 
-이 디렉터리의 루트가 TinyIoT 소스 루트입니다. 별도 `MN-CSE/tinyIoT/` 하위 디렉터리는
-없습니다. 이번 통합 구성은 단일 MEC의 MN-CSE 모드이며, Registrar/Remote CSE 연결은
-설정하지 않습니다.
+이 디렉터리는 MEC Node에서 실행하는 TinyIoT Middle Node CSE 소스와 Seed DB입니다. 기본
+배포에서 AI-AE는 같은 Computer A의 MN-CSE에 로컬 HTTP로 연결하고, Monitoring Node의
+IN-CSE는 등록된 Remote CSE로 접근합니다.
 
-## 빌드 설정
+## 빌드 환경과 설정
 
-프로젝트 루트 `.env`를 단일 설정 원천으로 사용합니다. 최초 로컬 통합 설정:
+WSL Ubuntu/Linux에서 GCC, GNU Make, pkg-config, OpenSSL 및 libwebsockets 개발 파일이
+필요합니다. 프로젝트 루트 `.env`를 사용합니다.
 
 ```bash
 python3 MN-CSE/scripts/build.py --init-local-env
-```
-
-이후 빌드:
-
-```bash
+# root .env에서 환경별 Originator, Resource ID 및 SP ID 확인/설정
 python3 MN-CSE/scripts/build.py
 ```
 
-빌드 환경은 WSL/Linux이며 GCC, GNU Make, pkg-config, OpenSSL 및 libwebsockets 개발 파일이
-필요합니다. 스크립트는 `.env`의 TinyIoT 필수값, AI-AE Base Name/RVI, seed DB의 고정
-Resource ID와 field schema를 검증합니다. Base RI는 seed DB에서 읽을 수 있으며 Base SP ID는
-DB에 저장되지 않아 `.env`에 별도로 설정되어 있어야 합니다.
+빌드 스크립트는 필수 설정, MN mode, CSE Base Name/RVI 및 Seed DB의 Resource ID/schema를
+검증하고 `config.h`, `Makefile`을 생성해 컴파일합니다. `TINYIOT_CSE_BASE_SP_ID`는 Seed DB에서
+읽히지 않으므로 직접 설정해야 합니다. 생성된 파일을 직접 편집하지 않습니다.
 
-`config.h.in` 및 `Makefile.in`은 추적 템플릿입니다. build script가 `config.h`, `Makefile`을
-생성하고 `make`를 실행하므로 자동 생성 파일을 직접 수정하지 않습니다. 기존
-`autogen.sh`는 interactive이며 일반 통합 빌드 경로로 사용하지 않습니다.
+## Seed DB, Runtime DB 및 실행
 
-## 데이터베이스와 실행
-
-`data.db`는 빈 DB가 아닌 CSE Base 및 Device1~Device6 FlexContainer가 포함된 초기 seed입니다.
-TinyIoT DB 초기화 코드는 현재 디렉터리의 `data.db`를 열고 테이블만 준비합니다. 빈 파일에서
-Device1~6 리소스를 자동 생성하지 않습니다.
-
-실행:
+`data.db`는 CSE Base 및 Device1~Device6 FlexContainer가 포함된 Seed DB입니다. 최초 실행 시
+`MN-CSE/runtime/data.db`에 복사되며, 이후 실행에서 기존 runtime DB를 유지합니다. 실제 센서
+업데이트는 runtime DB에서 확인합니다.
 
 ```bash
 python3 MN-CSE/scripts/run.py
 ```
 
-처음 실행할 때 seed DB를 `MN-CSE/runtime/data.db`로 복사하고 이후에는 해당 runtime DB를
-재사용합니다. SDT definitions도 runtime working directory에 복사합니다. 따라서 실시간
-업데이트를 `data.db` seed가 아닌 `runtime/data.db`에서 확인합니다.
+SDT definitions도 runtime working directory에 복사됩니다. Runtime DB를 초기화하거나 Seed DB로
+덮어쓰는 작업 전에는 사용자 데이터를 백업해야 합니다.
 
-## 네트워크 및 oneM2M 통신
+## 주소와 oneM2M 연결
 
-- HTTP port: `.env`의 `TINYIOT_SERVER_PORT` (통합 기본 3000)
-- HTTP listener bind: `0.0.0.0`
-- CSE POA 광고 IP: `.env`의 `TINYIOT_SERVER_IP`
-- AI-AE target: `CSE_BASE_URL=http://127.0.0.1:3000`
-- CSE Base Name 및 RVI: `.env`의 `CSE_BASE_NAME`, `CSE_RVI`와 일치
-- AI-AE write: 기존 Device1~Device6 Resource ID에 oneM2M HTTP PUT
+- HTTP listener는 `0.0.0.0`에 bind합니다.
+- `TINYIOT_SERVER_PORT`는 listener 포트이며 통합 기본값은 `3000`입니다.
+- `TINYIOT_SERVER_IP`는 CSE Base POA에 광고하는 MEC Node 주소입니다. 다른 장비에서 접근
+  가능해야 하며 listener bind address와 다릅니다.
+- AI-AE의 `CSE_BASE_URL`은 same-node loopback 연결입니다. 현재 root build validation은
+  `http://127.0.0.1:3000`을 요구합니다.
+- MEC Package의 Remote CSE endpoint는 `REMOTE_CSE_ID`, `REMOTE_CSE_NAME`,
+  `REMOTE_CSE_HOST`, `REMOTE_CSE_PORT` runtime 환경 설정으로 전달됩니다. 대상은 Monitoring
+  Node의 IN-CSE입니다.
+- Remote CSE가 설정된 경우 등록/CSR 생성은 백그라운드 재시도합니다. IN-CSE가 아직
+  도달되지 않아도 로컬 MN-CSE는 시작할 수 있으며, 등록 상태가 ready라는 의미는 아닙니다.
 
-`SERVER_IP`는 listener bind IP가 아니라 POA 광고값입니다.
+## 패키지와 범위
 
-## Dashboard 및 기타 범위
-
-Dashboard는 별도 개발 완료 상태이나 이 저장소에는 아직 통합되지 않았습니다. IN-CSE, Remote CSE 등록,
-다중 MEC discovery, 자동 Resource ID 관리, Docker Compose 또한 현재 구현 범위가 아닙니다.
+[MEC Package](../docs/PACKAGING.md)는 MN-CSE 및 AI-AE를 포함하고,
+[배포 가이드](../docs/DEPLOYMENT.md)는 POA 및 원격 연결 설정을 설명합니다. 다중 MEC
+discovery, 별도 registry, 자동 failover는 현재 범위가 아닙니다.

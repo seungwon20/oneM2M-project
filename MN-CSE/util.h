@@ -38,6 +38,7 @@ bool isSPIDLocal(char* address);
 bool isSpRelativeLocal(char* address);
 
 // Remote-CSE
+bool remote_cse_is_configured();
 int register_remote_cse();
 int create_local_csr();
 int update_remote_csr_dcse();

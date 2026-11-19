@@ -1,5 +1,7 @@
 *.o
 server
+config.h
+Makefile.generated
 *.db
 *.log
 .DS_Store

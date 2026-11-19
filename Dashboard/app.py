@@ -35,13 +35,12 @@ FRESH_SECONDS = int(os.getenv('PG_FRESH_SECONDS', '15'))
 FRAME_LIMIT = 2_000_000
 MAX_EVENT_BODY = 1_000_000
 
-# Direct MN-CSE pull configuration. Configure these in the FastAPI process environment.
-MN_CSE_URL = os.getenv('PG_MN_CSE_URL', '').rstrip('/')
-MN_CSE_BASE = os.getenv('PG_MN_CSE_BASE', 'TinyIoT').strip('/')
-MN_CSE_CONTAINER = os.getenv('PG_MN_CSE_CONTAINER', 'EdgeGuardMEC').strip('/')
-MN_CSE_ORIGIN = os.getenv('PG_MN_CSE_ORIGIN', 'CAdmin')
-MN_CSE_RVI = os.getenv('PG_MN_CSE_RVI', '3')
-MN_CSE_TIMEOUT = float(os.getenv('PG_MN_CSE_TIMEOUT', '3'))
+# Dashboard reads the remote MN-CSE through the local IN-CSE registrar.
+IN_CSE_URL = os.getenv('PG_IN_CSE_URL', '').rstrip('/')
+MN_CSE_ID = os.getenv('PG_MN_CSE_ID', '').strip('/')
+IN_CSE_ORIGIN = os.getenv('PG_IN_CSE_ORIGIN', '')
+IN_CSE_RVI = os.getenv('PG_IN_CSE_RVI', '3')
+IN_CSE_TIMEOUT = float(os.getenv('PG_IN_CSE_TIMEOUT', '3'))
 MN_CSE_FRESH_SECONDS = int(os.getenv('PG_MN_CSE_FRESH_SECONDS', '30'))
 MN_CSE_POLL_SECONDS = max(1.0, float(os.getenv('PG_MN_CSE_POLL_SECONDS', '10')))
 MN_DEVICE_IDS = tuple(f'Device{i}' for i in range(1, 7))
@@ -233,7 +232,7 @@ def state():
     # PINCHGUARD_MN_LIVE_BRIDGE_v1
     # LIVE 화면에 별도로 폴링한 MN-CSE 장치별 데이터를 반영한다.
     # 원본 수신 시각을 사용하며, 오래된 데이터를 새 데이터처럼 표시하지 않는다.
-    if m == 'live' and MN_CSE_URL:
+    if m == 'live' and _in_cse_configured():
         from datetime import datetime as _mn_datetime, timezone as _mn_timezone
         with _mn_cache_lock:
             _mn_snapshot = dict(_mn_cache) if _mn_cache is not None else {}
@@ -310,7 +309,7 @@ def state():
                 }
     # PINCHGUARD_MN_HISTORY_v1: persist the *source* revisions, not every GET.
     # Do not generate synthetic/derived risk decisions here; only record Device6.
-    if m == 'live' and MN_CSE_URL:
+    if m == 'live' and _in_cse_configured():
         with lock:
             if _d5 is not None and s:
                 _rev5 = f"Device5:{_v5.get('st')}:{_t5:.3f}"
@@ -343,9 +342,9 @@ def state():
     fps = round(sum(x >= now-3 for x in live_times)/3,1) if video_ok else 0
     with conn() as c:
         events = [dict(x) for x in c.execute('''SELECT id,received_at,category,severity,device_id,description,
-                 source,is_demo,ack_at,data_json FROM events WHERE is_demo=? AND (is_demo=1 OR source LIKE 'MN-CSE%') ORDER BY id DESC LIMIT 35''', (int(m=='demo'),))]
-        counts = c.execute('SELECT COUNT(*) total, SUM(CASE WHEN severity="HIGH" THEN 1 ELSE 0 END) highs, SUM(CASE WHEN severity="CRITICAL" THEN 1 ELSE 0 END) criticals FROM events WHERE is_demo=? AND (is_demo=1 OR source LIKE \'MN-CSE%\') AND category=\"RISK\"',(int(m=='demo'),)).fetchone()
-        history = [dict(x) for x in c.execute('''SELECT received_at,data_json FROM events WHERE is_demo=? AND (is_demo=1 OR source LIKE 'MN-CSE%') AND category='SENSOR' ORDER BY id DESC LIMIT 60''',(int(m=='demo'),))]
+                 source,is_demo,ack_at,data_json FROM events WHERE is_demo=? ORDER BY id DESC LIMIT 35''', (int(m=='demo'),))]
+        counts = c.execute('SELECT COUNT(*) total, SUM(CASE WHEN severity="HIGH" THEN 1 ELSE 0 END) highs, SUM(CASE WHEN severity="CRITICAL" THEN 1 ELSE 0 END) criticals FROM events WHERE is_demo=? AND category=\"RISK\"',(int(m=='demo'),)).fetchone()
+        history = [dict(x) for x in c.execute('''SELECT received_at,data_json FROM events WHERE is_demo=? AND category='SENSOR' ORDER BY id DESC LIMIT 60''',(int(m=='demo'),))]
     for e in events:
         e['received_at_iso'] = utc_iso(e['received_at'])
         e['payload'] = json.loads(e.pop('data_json'))
@@ -443,21 +442,29 @@ def _parse_onem2m_device(device_id: str, body: Any) -> dict[str, Any]:
     return resource
 
 
+def _in_cse_configured() -> bool:
+    return bool(IN_CSE_URL and MN_CSE_ID and IN_CSE_ORIGIN and IN_CSE_RVI)
+
+
 def _fetch_onem2m_device(device_id: str) -> dict[str, Any]:
-    if not MN_CSE_URL:
-        return {'device_id': device_id, 'ok': False, 'error': 'PG_MN_CSE_URL is not configured'}
-    path = '/'.join(quote(part, safe='') for part in (MN_CSE_BASE, MN_CSE_CONTAINER, device_id))
-    url = f'{MN_CSE_URL}/{path}'
+    if not _in_cse_configured():
+        return {
+            'device_id': device_id,
+            'ok': False,
+            'error': 'PG_IN_CSE_URL, PG_MN_CSE_ID, PG_IN_CSE_ORIGIN and PG_IN_CSE_RVI are required',
+        }
+    path = '/'.join(quote(part, safe='') for part in (MN_CSE_ID.strip('/'), device_id))
+    url = f'{IN_CSE_URL}/~/{path}'
     headers = {
-        'X-M2M-Origin': MN_CSE_ORIGIN,
+        'X-M2M-Origin': IN_CSE_ORIGIN,
         'X-M2M-RI': f'pinchguard-{device_id.lower()}-{int(time.time() * 1000)}',
-        'X-M2M-RVI': MN_CSE_RVI,
+        'X-M2M-RVI': IN_CSE_RVI,
         'Accept': 'application/json',
     }
     request = urllib.request.Request(url, headers=headers, method='GET')
     fetched_at = time.time()
     try:
-        with urllib.request.urlopen(request, timeout=MN_CSE_TIMEOUT) as response:
+        with urllib.request.urlopen(request, timeout=IN_CSE_TIMEOUT) as response:
             status = response.status
             raw = response.read(256_000)
         if status != 200:
@@ -510,11 +517,10 @@ def _poll_mn_cse_once():
     ordered = [results[d] for d in MN_DEVICE_IDS]
     success_count = sum(1 for item in ordered if item.get('ok'))
     return {
-        'source': 'MN-CSE',
-        'configured': bool(MN_CSE_URL),
-        'cse_url': MN_CSE_URL or None,
-        'cse_base': MN_CSE_BASE,
-        'container': MN_CSE_CONTAINER,
+        'source': 'MN-CSE via IN-CSE',
+        'configured': _in_cse_configured(),
+        'cse_url': IN_CSE_URL or None,
+        'remote_cse_id': MN_CSE_ID or None,
         'fetched_at': utc_iso(),
         'poll_interval_sec': MN_CSE_POLL_SECONDS,
         'success_count': success_count,
@@ -542,7 +548,7 @@ def _mn_poll_loop():
                 _mn_cache = result
         except Exception as exc:
             with _mn_cache_lock:
-                _mn_cache = {'source': 'MN-CSE', 'configured': bool(MN_CSE_URL),
+                _mn_cache = {'source': 'MN-CSE via IN-CSE', 'configured': _in_cse_configured(),
                              'connected': False, 'error': str(exc)[:240],
                              'devices': [], 'success_count': 0, 'device_count': len(MN_DEVICE_IDS),
                              'poll_interval_sec': MN_CSE_POLL_SECONDS, 'fetched_at': utc_iso()}
@@ -553,7 +559,7 @@ def _mn_poll_loop():
 @app.on_event('startup')
 def start_mn_polling():
     global _mn_worker
-    if not MN_CSE_URL:
+    if not _in_cse_configured():
         return
     if _mn_worker is not None and _mn_worker.is_alive():
         return
@@ -566,7 +572,7 @@ def start_mn_polling():
 def stop_mn_polling():
     _mn_stop.set()
     if _mn_worker is not None:
-        _mn_worker.join(timeout=MN_CSE_TIMEOUT + 2)
+        _mn_worker.join(timeout=IN_CSE_TIMEOUT + 2)
 
 
 @app.get('/api/onem2m/devices')
@@ -575,8 +581,9 @@ def onem2m_devices():
     with _mn_cache_lock:
         snapshot = dict(_mn_cache) if _mn_cache is not None else None
     if snapshot is None:
-        return {'source': 'MN-CSE', 'configured': bool(MN_CSE_URL), 'connected': False,
-                'polling': bool(MN_CSE_URL), 'status': 'waiting_for_first_poll' if MN_CSE_URL else 'not_configured',
+        return {'source': 'MN-CSE via IN-CSE', 'configured': _in_cse_configured(), 'connected': False,
+                'polling': bool(_in_cse_configured()),
+                'status': 'waiting_for_first_poll' if _in_cse_configured() else 'not_configured',
                 'devices': [], 'success_count': 0, 'device_count': len(MN_DEVICE_IDS),
                 'poll_interval_sec': MN_CSE_POLL_SECONDS, 'fetched_at': None}
     # Age cached source readings against now; HTTP poll success != fresh sensor data.

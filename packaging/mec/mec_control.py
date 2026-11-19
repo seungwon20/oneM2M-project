@@ -40,6 +40,10 @@ REQUIRED_SETTINGS = (
     "TINYIOT_CSE_BASE_SP_ID",
     "AI_AE_HOST",
     "AI_AE_PORT",
+    "REMOTE_CSE_ID",
+    "REMOTE_CSE_NAME",
+    "REMOTE_CSE_HOST",
+    "REMOTE_CSE_PORT",
 )
 PLACEHOLDER_PREFIXES = (
     "YOUR_",
@@ -147,7 +151,10 @@ def configure_mec(root: Path) -> None:
     temp_path = env_path.with_name(".env.tmp")
     temp_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     temp_path.replace(env_path)
-    print("Created config/.env from the bundled seed. Set AE_ID and TINYIOT_SERVER_IP before starting.")
+    print(
+        "Created config/.env from the bundled seed. Set AE_ID, TINYIOT_SERVER_IP, "
+        "and REMOTE_CSE_* before starting."
+    )
 
 
 def _load_settings(root: Path) -> dict[str, str]:
@@ -195,11 +202,18 @@ def validate_settings(root: Path, settings: dict[str, str]) -> None:
 
     server_port = _port(settings, "TINYIOT_SERVER_PORT")
     _port(settings, "AI_AE_PORT")
+    _port(settings, "REMOTE_CSE_PORT")
     expected_url = f"http://127.0.0.1:{server_port}"
     if settings["CSE_BASE_URL"].rstrip("/") != expected_url:
         raise ValueError("CSE_BASE_URL must use 127.0.0.1 and TINYIOT_SERVER_PORT.")
     if settings["CSE_RVI"] != build_info["CSE_RVI"]:
         raise ValueError("CSE_RVI does not match the TinyIoT binary in this package.")
+    if not settings["REMOTE_CSE_ID"].startswith("/") or "/" in settings["REMOTE_CSE_ID"][1:]:
+        raise ValueError("REMOTE_CSE_ID must be one CSE identifier starting with '/'.")
+    if "/" in settings["REMOTE_CSE_NAME"]:
+        raise ValueError("REMOTE_CSE_NAME must be a single resource name.")
+    if any(character in settings["REMOTE_CSE_HOST"] for character in (":", "/", " ", "\t")):
+        raise ValueError("REMOTE_CSE_HOST must be a host name or IPv4 address without a scheme or port.")
 
     for key in (
         "CSE_BASE_NAME",
@@ -309,6 +323,25 @@ def _check_ai(settings: dict[str, str]) -> bool:
     except ValueError:
         return False
     return isinstance(payload, dict) and payload.get("status") == "ok"
+
+
+def _check_remote_registration(settings: dict[str, str]) -> bool:
+    url = (
+        f"http://{settings['REMOTE_CSE_HOST']}:{settings['REMOTE_CSE_PORT']}/"
+        f"{quote(settings['REMOTE_CSE_NAME'], safe='')}/"
+        f"{quote(settings['TINYIOT_CSE_BASE_RI'], safe='')}"
+    )
+    headers = {
+        "Accept": "application/json",
+        "X-M2M-Origin": f"/{settings['TINYIOT_CSE_BASE_RI']}",
+        "X-M2M-RI": "mec-remote-registration-health",
+        "X-M2M-RVI": settings["CSE_RVI"],
+    }
+    try:
+        response = httpx.get(url, headers=headers, timeout=1.5, trust_env=False)
+    except httpx.HTTPError:
+        return False
+    return response.status_code == 200 and response.headers.get("X-M2M-RSC") == "2000"
 
 
 def _wait_for_service(
@@ -442,6 +475,8 @@ def check_status(root: Path, *, verbose: bool) -> int:
     ai_ok = _check_ai(settings)
     print(f"MN-CSE health: {'ok' if cse_ok else 'failed'}")
     print(f"AI-AE health: {'ok' if ai_ok else 'failed'}")
+    remote_ok = _check_remote_registration(settings)
+    print(f"IN-CSE registration: {'ready' if remote_ok else 'pending or unavailable'}")
     if verbose and not (cse_ok and ai_ok):
         print("Inspect runtime/logs/mn-cse.log and runtime/logs/ai-ae.log.")
     return 0 if cse_ok and ai_ok else 1

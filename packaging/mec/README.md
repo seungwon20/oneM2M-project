@@ -44,5 +44,6 @@ the recorded package processes; unrelated processes are not signalled.
 `runtime/data.db`; subsequent starts preserve the runtime database. Back up `runtime/` before
 upgrading the package.
 
-The current package is built for Linux x86_64 only. Dashboard is separately developed but its
-source is not integrated into this repository, so no Dashboard Package is produced yet.
+The current package is built for Linux x86_64 only. The complementary Monitoring Package contains
+TinyIoT IN-CSE and the integrated PinchGuard Dashboard; build and two-node deployment status are
+described in the repository's packaging and deployment guides.

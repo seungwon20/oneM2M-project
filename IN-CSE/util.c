@@ -1236,6 +1236,12 @@ bool init_server()
 {
 	bool setup = false;
 	char poa[128] = { 0 };
+	const char *server_ip = getenv("IN_CSE_SERVER_IP");
+	const char *server_port = getenv("IN_CSE_SERVER_PORT");
+	if (!server_ip || !server_ip[0])
+		server_ip = SERVER_IP;
+	if (!server_port || !server_port[0])
+		server_port = SERVER_PORT;
 
 	rt = (ResourceTree*)calloc(1, sizeof(ResourceTree));
 
@@ -1270,7 +1276,7 @@ bool init_server()
 	if (ioctl(s, SIOCGIFADDR, &ifr) < 0)
 	{
 		logger("UTIL", LOG_LEVEL_ERROR, "NIC_NAME is invalid, using SERVER_IP");
-		sprintf(ipstr, "%s", SERVER_IP);
+		snprintf(ipstr, sizeof(ipstr), "%s", server_ip);
 	}
 	else
 	{
@@ -1278,10 +1284,10 @@ bool init_server()
 		logger("UTIL", LOG_LEVEL_INFO, "NIC IP : %s", ipstr);
 	}
 	close(s);
-	sprintf(poa, "http://%s:%s", ipstr, SERVER_PORT);
+	snprintf(poa, sizeof(poa), "http://%s:%s", ipstr, server_port);
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 #endif
-	sprintf(poa, "http://%s:%s", SERVER_IP, SERVER_PORT);
+	snprintf(poa, sizeof(poa), "http://%s:%s", server_ip, server_port);
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 
 #ifdef ENABLE_MQTT

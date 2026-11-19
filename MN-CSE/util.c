@@ -1328,16 +1328,12 @@ bool bootstrap_cse()
 
 	if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
 	{
-		if (register_remote_cse() != 0)
+		if (!remote_cse_is_configured())
 		{
-			logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE registration failed");
-			return false;
+			logger("UTIL", LOG_LEVEL_WARN, "Remote CSE is not configured; local CSE will start without registration");
 		}
-		if (create_local_csr())
-		{
-			logger("UTIL", LOG_LEVEL_ERROR, "Local CSR creation failed");
-			return false;
-		}
+		else
+			logger("UTIL", LOG_LEVEL_INFO, "Remote CSE registration will run in the background");
 	}
 
 	return true;
@@ -4326,13 +4322,50 @@ bool isETvalid(char* et)
 	return true;
 }
 
+static const char *remote_cse_setting(const char *name, const char *fallback)
+{
+	const char *value = getenv(name);
+	return value && value[0] ? value : fallback;
+}
+
+static int remote_cse_port_value(void)
+{
+	const char *value = getenv("REMOTE_CSE_PORT");
+	char *end = NULL;
+	long port;
+
+	if (!value || !value[0])
+		return REMOTE_CSE_PORT;
+	port = strtol(value, &end, 10);
+	if (*end != '\0' || port < 1 || port > 65535)
+		return 0;
+	return (int)port;
+}
+
+bool remote_cse_is_configured(void)
+{
+	const char *remote_id = remote_cse_setting("REMOTE_CSE_ID", REMOTE_CSE_ID);
+	const char *remote_name = remote_cse_setting("REMOTE_CSE_NAME", REMOTE_CSE_NAME);
+	const char *remote_host = remote_cse_setting("REMOTE_CSE_HOST", REMOTE_CSE_HOST);
+	return remote_id[0] && remote_name[0] && remote_host[0] && remote_cse_port_value() > 0;
+}
+
 int register_remote_cse()
 {
 	char buf[1024];
+	const char *remote_name = remote_cse_setting("REMOTE_CSE_NAME", REMOTE_CSE_NAME);
+	const char *remote_host = remote_cse_setting("REMOTE_CSE_HOST", REMOTE_CSE_HOST);
+	int remote_port = remote_cse_port_value();
 	HTTPRequest* req = (HTTPRequest*)calloc(sizeof(HTTPRequest), 1);
 	HTTPResponse* res = (HTTPResponse*)calloc(sizeof(HTTPResponse), 1);
 	int status_code = 0;
-	sprintf(buf, "/%s/%s", REMOTE_CSE_NAME, CSE_BASE_RI);
+	if (!remote_cse_is_configured())
+	{
+		free_HTTPRequest(req);
+		free_HTTPResponse(res);
+		return -1;
+	}
+	snprintf(buf, sizeof(buf), "/%s/%s", remote_name, CSE_BASE_RI);
 
 	req->method = "GET";
 	req->uri = strdup(buf);
@@ -4347,83 +4380,72 @@ int register_remote_cse()
 	// add_header("Content-Type", "application/json", req->headers);
 	add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
 
-	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
+	send_http_request((char *)remote_host, remote_port, req, res);
 	logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration check: %d", res->status_code);
 	status_code = res->status_code;
 
-	if (status_code == 999 || status_code == 500)
+	if (status_code == 200)
 	{
-		logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE is not running");
+		free_HTTPRequest(req);
+		free_HTTPResponse(res);
+		return 0;
+	}
+	if (status_code != 404)
+	{
 		free_HTTPRequest(req);
 		free_HTTPResponse(res);
 		return status_code;
 	}
 
-	if (res->status_code != 200)
-	{
-		free_HTTPRequest(req);
-		free_HTTPResponse(res);
-		logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE is not registered");
-		req = (HTTPRequest*)calloc(sizeof(HTTPRequest), 1);
-		res = (HTTPResponse*)calloc(sizeof(HTTPResponse), 1);
-		// register MN-CSE
-		req->method = "POST";
-		sprintf(buf, "/%s", REMOTE_CSE_NAME);
-		req->uri = strdup(buf);
-		req->qs = NULL;
-		req->prot = strdup("HTTP/1.1");
-
-		req->headers = calloc(sizeof(header_t), 1);
-		add_header("X-M2M-Origin", "/" CSE_BASE_RI, req->headers);
-		add_header("X-M2M-RI", "register-cse", req->headers);
-		add_header("Accept", "application/json", req->headers);
-		add_header("Content-Type", "application/json;ty=16", req->headers);
-		add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
-
-		cJSON* root = cJSON_CreateObject();
-		cJSON* csr = cJSON_Duplicate(rt->cb->obj, 1);
-		init_csr(csr);
-		cJSON_AddItemToObject(root, get_resource_key(RT_CSR), csr);
-		req->payload = cJSON_PrintUnformatted(root);
-		cJSON_Delete(root);
-
-		req->payload_size = strlen(req->payload);
-		send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
-		logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration: %d", res->status_code);
-		logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration: %s", res->payload);
-		char* rsc = 0;
-		if ((rsc = search_header(res->headers, "x-m2m-rsc")))
-		{
-			logger("UTIL", LOG_LEVEL_DEBUG, "Remote CSE registration: %s", rsc);
-			if (atoi(rsc) != RSC_CREATED)
-			{
-				logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE registration failed");
-				free_HTTPRequest(req);
-				free_HTTPResponse(res);
-				return atoi(rsc);
-			}
-		}
-		else
-		{
-			logger("UTIL", LOG_LEVEL_ERROR, "Remote CSE registration failed");
-			free_HTTPRequest(req);
-			free_HTTPResponse(res);
-			return -1;
-		}
-	}
-
 	free_HTTPRequest(req);
 	free_HTTPResponse(res);
+	req = (HTTPRequest*)calloc(sizeof(HTTPRequest), 1);
+	res = (HTTPResponse*)calloc(sizeof(HTTPResponse), 1);
+	req->method = "POST";
+	snprintf(buf, sizeof(buf), "/%s", remote_name);
+	req->uri = strdup(buf);
+	req->prot = strdup("HTTP/1.1");
+	req->headers = calloc(sizeof(header_t), 1);
+	add_header("X-M2M-Origin", "/" CSE_BASE_RI, req->headers);
+	add_header("X-M2M-RI", "register-cse", req->headers);
+	add_header("Accept", "application/json", req->headers);
+	add_header("Content-Type", "application/json;ty=16", req->headers);
+	add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
 
+	cJSON* root = cJSON_CreateObject();
+	cJSON* csr = cJSON_Duplicate(rt->cb->obj, 1);
+	init_csr(csr);
+	cJSON_AddItemToObject(root, get_resource_key(RT_CSR), csr);
+	req->payload = cJSON_PrintUnformatted(root);
+	cJSON_Delete(root);
+	req->payload_size = strlen(req->payload);
+	send_http_request((char *)remote_host, remote_port, req, res);
+	logger("UTIL", LOG_LEVEL_INFO, "Remote CSE registration response: HTTP %d", res->status_code);
+	char* rsc = search_header(res->headers, "x-m2m-rsc");
+	if (!rsc || atoi(rsc) != RSC_CREATED)
+	{
+		int result = rsc ? atoi(rsc) : res->status_code;
+		free_HTTPRequest(req);
+		free_HTTPResponse(res);
+		return result ? result : -1;
+	}
+	free_HTTPRequest(req);
+	free_HTTPResponse(res);
 	return 0;
 }
 
 int create_local_csr()
 {
 	char buf[256] = { 0 };
-	char *cse_ri = strchr(REMOTE_CSE_ID, '/');
+	const char *remote_id = remote_cse_setting("REMOTE_CSE_ID", REMOTE_CSE_ID);
+	const char *remote_name = remote_cse_setting("REMOTE_CSE_NAME", REMOTE_CSE_NAME);
+	const char *remote_host = remote_cse_setting("REMOTE_CSE_HOST", REMOTE_CSE_HOST);
+	int remote_port = remote_cse_port_value();
+	if (!remote_cse_is_configured())
+		return -1;
+	const char *cse_ri = strchr(remote_id, '/');
 	if (cse_ri) cse_ri++;
-	else cse_ri = REMOTE_CSE_ID;
+	else cse_ri = remote_id;
 	
 	snprintf(buf, sizeof(buf), "%s/%s", CSE_BASE_NAME, cse_ri);
 	RTNode* existing_csr = find_rtnode(buf);
@@ -4441,7 +4463,8 @@ int create_local_csr()
 	HTTPResponse* res = (HTTPResponse*)calloc(1, sizeof(HTTPResponse));
 	
 	req->method = "GET";
-	req->uri = strdup("/" REMOTE_CSE_NAME);
+	snprintf(buf, sizeof(buf), "/%s", remote_name);
+	req->uri = strdup(buf);
 	req->qs = NULL;
 	req->prot = strdup("HTTP/1.1");
 	req->payload = NULL;
@@ -4453,14 +4476,15 @@ int create_local_csr()
 	// add_header("Content-Type", "application/json", req->headers);
 	add_header("X-M2M-RVI", from_rvi(CSE_RVI), req->headers);
 	
-	send_http_request(REMOTE_CSE_HOST, REMOTE_CSE_PORT, req, res);
+	send_http_request((char *)remote_host, remote_port, req, res);
 	
-	if (res->status_code == 404)
+	if (res->status_code != 200 || !res->payload)
 	{
-		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE is not online : %d", res->status_code);
+		int status_code = res->status_code;
+		logger("MAIN", LOG_LEVEL_WARN, "Remote CSE base is unavailable: HTTP %d", status_code);
 		free_HTTPRequest(req);
 		free_HTTPResponse(res);
-		return res->status_code;
+		return status_code ? status_code : -1;
 	}
 	
 	cJSON* csr = cJSON_CreateObject();
@@ -4469,19 +4493,36 @@ int create_local_csr()
 	cJSON_DeleteItemFromObject(csr, "rn");
 	snprintf(buf, sizeof(buf), "/%s", cse_ri);
 	cJSON_AddItemToObject(csr, "csi", cJSON_CreateString(buf));
-	snprintf(buf, sizeof(buf), "/%s/%s", cse_ri, REMOTE_CSE_NAME);
+	snprintf(buf, sizeof(buf), "/%s/%s", cse_ri, remote_name);
 	cJSON_AddItemToObject(csr, "cb", cJSON_CreateString(buf));
 	cJSON_AddItemToObject(csr, "rn", cJSON_CreateString(cse_ri));
 	cJSON *poa = cJSON_CreateArray();
-	char buffer[128] = { 0 };
-	snprintf(buffer, 128, "http://%s:%d", REMOTE_CSE_HOST, REMOTE_CSE_PORT);
+	char *buffer = malloc(strlen(remote_host) + 32);
+	snprintf(buffer, strlen(remote_host) + 32, "http://%s:%d", remote_host, remote_port);
 	cJSON_AddItemToArray(poa, cJSON_CreateString(buffer));
+	free(buffer);
 	// ToDo: add mqtt, ws, coap poa
 	cJSON_AddItemToObject(csr, "poa", poa);
 	
 	cJSON* root = cJSON_Parse(res->payload);
+	if (!root)
+	{
+		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE returned invalid JSON");
+		cJSON_Delete(csr);
+		free_HTTPRequest(req);
+		free_HTTPResponse(res);
+		return -1;
+	}
 	cJSON* remote_cb = cJSON_GetObjectItem(root, get_resource_key(RT_CSE));
-	if (remote_cb)
+	if (!remote_cb)
+	{
+		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE returned an invalid CSE Base response");
+		cJSON_Delete(root);
+		cJSON_Delete(csr);
+		free_HTTPRequest(req);
+		free_HTTPResponse(res);
+		return -1;
+	}
 	{
 		cJSON* pjson = NULL;
 		if ((pjson = cJSON_GetObjectItem(remote_cb, "cst")))
@@ -4506,8 +4547,6 @@ int create_local_csr()
 		{
 			cJSON_AddItemToObject(csr, "srv", cJSON_Duplicate(pjson, 1));
 		}
-	} else {
-		logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE not valid");
 	}
 		
 	cJSON_Delete(root);

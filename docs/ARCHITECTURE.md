@@ -1,105 +1,103 @@
-# 단일 MEC AI-AE + MN-CSE 아키텍처
+# 통합 시스템 아키텍처
 
-## 범위와 구성 요소
+## 컴포넌트 경계
 
-| 구성 요소 | 저장소 내 상태 | 책임 |
+| 컴포넌트 | 기본 배치 | 책임 |
 |---|---|---|
-| MEC 환경 | 단일 컴퓨터/WSL 실행 환경 | AI-AE와 MN-CSE 프로세스를 호스팅 |
-| AI-AE | `AI-AE/` | 센서 API, 입력 검증, 최신 상태, 위험도 추론, oneM2M 업데이트 |
-| MN-CSE | `MN-CSE/` TinyIoT 소스 루트 | oneM2M 리소스 및 센서/위험 데이터 저장 |
-| Mock PLC | AI-AE의 데모 코드 | CRITICAL 시 TCP STOP 요청을 시험하는 선택 컴포넌트 |
-| Dashboard | 별도 개발 완료, 저장소 미통합 | 이번 통합/실행 범위 외부 |
+| AI-AE | MEC Node | 센서 payload 검증, 최신 상태 관리, ML 위험도 추론, 고정 리소스 update |
+| TinyIoT MN-CSE | MEC Node | AI-AE의 oneM2M 요청 수신, Device1~Device6 리소스 제공 및 원격 POA 광고 |
+| TinyIoT IN-CSE | Monitoring Node | MN-CSE Remote CSE 등록 수락, oneM2M 원격 요청 전달 |
+| PinchGuard Dashboard | Monitoring Node | UI 제공, Backend polling 및 센서/위험 정보를 표시 |
+| Mock PLC | 개발/demo용 | AI-AE의 CRITICAL STOP 흐름을 모의하는 TCP endpoint |
 
-MEC는 실행 인프라/환경이며 AI-AE는 그 환경에 설치되는 애플리케이션입니다.
-현재 구성은 한 컴퓨터에서 AI-AE와 MN-CSE를 실행하는 단일 MEC입니다. CSE 또는 장비의
-자동 발견, 다중 MEC 등록, Registry 기능은 포함하지 않습니다.
+MEC는 노드/실행 환경이고 AI-AE는 MEC에서 실행되는 애플리케이션입니다. IN-CSE는 이번
+배포 구조의 통합/라우팅 서비스 계층이며 Dashboard UI 자체와는 다른 프로세스입니다.
 
-## 전체 데이터 흐름
+## 배치 및 관계
 
 ```mermaid
 flowchart LR
+  subgraph MEC["Computer A — MEC Node"]
     Sensor["센서 / Mock Sender"]
-    subgraph Host["단일 MEC 호스트"]
-        AE["AI-AE<br/>FastAPI :8001"]
-        CSE["TinyIoT MN-CSE<br/>HTTP :3000"]
-        PLC["Mock PLC<br/>TCP :9001 (선택)"]
-    end
+    AE["AI-AE<br/>FastAPI"]
+    MN["TinyIoT MN-CSE<br/>HTTP"]
+    PLC["Mock PLC<br/>선택적"]
+    Sensor --> AE
+    AE -->|"HTTP PUT / oneM2M"| MN
+    AE -->|"CRITICAL STOP"| PLC
+  end
 
-    Sensor -->|"POST /api/devices/{device_id}/data"| AE
-    AE -->|"oneM2M HTTP PUT<br/>X-M2M-Origin / RI / RVI"| CSE
-    AE -->|"CRITICAL 위험도일 때 STOP"| PLC
+  subgraph Monitoring["Computer B — Monitoring Node"]
+    IN["TinyIoT IN-CSE"]
+    Backend["Dashboard Backend"]
+    Frontend["Dashboard Frontend"]
+    IN --> Backend
+    Backend --> Frontend
+  end
+
+  MN -->|"CSR 등록 요청; POA에 MEC의 도달 가능한 주소"| IN
+  Backend -->|"HTTP GET /~/&lt;MN-CSE-ID&gt;/DeviceN"| IN
+  IN -->|"등록된 CSR/POA 기반 forwarding"| MN
 ```
 
-Dashboard의 조회 흐름은 소스가 통합되지 않아 표현하지 않습니다.
+CSR 등록은 MEC의 MN-CSE가 Monitoring Node IN-CSE를 향해 시작합니다. Dashboard는 Browser에서
+MN-CSE를 직접 호출하지 않고 Dashboard Backend를 통해 IN-CSE에 요청합니다. IN-CSE가 등록된
+MN-CSE POA로 요청을 전달합니다.
 
-## AI-AE 내부 처리
+## 데이터 흐름
 
-1. FastAPI endpoint는 device1~device5 JSON payload를 받습니다.
-2. `device_schemas.py`는 해당 기기의 필드와 자료형을 검사합니다.
-3. 유효한 최신 값은 `LatestSensorState`의 프로세스 메모리에 저장됩니다.
-4. SensorTriggerEngine은 `device3.beam_blocked=true`이고 최신 `device4.is_rotating=true`인
-   경우에 모델을 실행합니다.
-5. 입력 feature는 Device1의 인원수, Device4의 회전 속도, Device5의 거리입니다.
-6. 센서 값은 Device1~5 각 FlexContainer를 업데이트하고, 추론 결과는 Device6 Risk
-   FlexContainer로 전송합니다.
-7. 예측이 `CRITICAL`이면 AI-AE가 PLC TCP STOP 요청을 시도합니다.
+1. 센서 또는 Mock Sender가 AI-AE HTTP API에 측정 feature를 보냅니다.
+2. AI-AE가 device별 schema와 값을 검증하고 프로세스 메모리의 최신 상태를 갱신합니다.
+3. Trigger 조건에서 ML 모델이 위험도를 추론합니다. CSV 라벨은 입력으로 전송하지 않습니다.
+4. AI-AE가 Device1~Device5의 고정 FlexContainer Resource ID를 갱신하고 위험 결과를 Device6에
+   기록합니다.
+5. 필요하면 `CRITICAL` 처리에서 AI-AE가 Mock PLC에 STOP demo 요청을 보냅니다.
+6. MN-CSE는 설정된 Remote CSE endpoint에 등록을 시도합니다. IN-CSE가 사용 가능하지 않아도
+   MEC 로컬 MN-CSE는 서비스를 시작하고 백그라운드에서 재시도합니다.
+7. Dashboard Backend는 `GET /~/<MN-CSE-ID>/Device1`부터 Device6까지를 IN-CSE에 요청합니다.
+   한 리소스 요청 실패가 나머지 요청을 숨기지 않습니다.
 
-AI-AE 최신 값은 메모리에만 유지되고 CSE 기록은 oneM2M 리소스 업데이트를 통해 별도로
-영속화됩니다. 별도 메시지 큐나 데이터베이스를 통한 Layer 1/Layer 2 분리는 없습니다.
+MN-CSE Remote CSE registration과 Dashboard routing은 소스상 구현되어 있으나, 이 문서 갱신
+시점의 두 컴퓨터 간 동작 결과를 성공으로 간주하지 않습니다.
 
-## AI-AE와 MN-CSE 간 통신
+## 통신 관계 및 주소
 
-- AI-AE base URL: `http://127.0.0.1:3000`
-- MN-CSE HTTP listener: port `3000`
-- 메서드: `PUT`
-- 성공 기준: HTTP `200`, `X-M2M-RSC: 2004`, 요청/응답 `X-M2M-RI` 일치
-- 요청 헤더: `X-M2M-Origin`, `X-M2M-RI`, `X-M2M-RVI`
-- CSE Base Name: `.env`의 AI-AE/TinyIoT 설정이 동일해야 함
-- RVI: `.env`의 `CSE_RVI`를 TinyIoT 컴파일 설정에도 동일하게 적용
-- AI-AE는 리소스를 생성하거나 ID를 발견하지 않고 고정 Resource ID로 update만 수행
+| From → To | 프로토콜 / URI | 사용처 |
+|---|---|---|
+| 센서 → AI-AE | HTTP, AI-AE API | 센서 입력 |
+| AI-AE → MN-CSE | oneM2M HTTP Binding, `CSE_BASE_URL` | Resource update |
+| MN-CSE → IN-CSE | oneM2M HTTP, `REMOTE_CSE_*` | CSR 확인/등록 및 Remote CSE metadata 조회 |
+| Dashboard Backend → IN-CSE | oneM2M HTTP, `/~/<MN-CSE-ID>/DeviceN` | 원격 센서/위험 조회 |
+| IN-CSE → MN-CSE | oneM2M HTTP forwarding, 등록된 POA | Dashboard 요청 전달 |
+| AI-AE → Mock PLC | TCP | 선택적 CRITICAL demo |
 
-### SERVER_IP와 bind 주소
+주소 구분:
 
-TinyIoT `httpd.c`의 `start_server()`는 `0.0.0.0`에 bind합니다. 반면 `util.c`는
-`SERVER_IP`를 CSE의 `poa` 주소에 기록합니다. 따라서:
+- AI-AE 로컬 요청: `CSE_BASE_URL` 기본 통합 형태는 `http://127.0.0.1:<MN-CSE-port>`.
+- MN-CSE listener: 코드에서 `0.0.0.0`에 bind합니다. `TINYIOT_SERVER_IP`는 listener bind가
+  아니라 MN-CSE가 광고하는 POA 주소이며 Monitoring Node에서 도달 가능해야 합니다.
+- IN-CSE listener: HTTP server의 `0.0.0.0` bind이며, `IN_CSE_SERVER_IP`는 광고 주소입니다.
+- Dashboard → IN-CSE: 기본 토폴로지에서는 같은 Monitoring Node이므로 loopback을 사용할 수
+  있습니다.
+- Dashboard/IN-CSE → MEC MN-CSE: MEC Node의 도달 가능한 네트워크 주소를 사용해야 합니다.
+  원격 MN-CSE 연결 주소에 `127.0.0.1`을 사용하면 안 됩니다.
 
-- `TINYIOT_SERVER_IP`는 광고되는 POA IP입니다.
-- `TINYIOT_SERVER_PORT`는 listener port이면서 POA의 port입니다.
-- AI-AE 연결 주소는 별도 설정 `CSE_BASE_URL`로 지정합니다.
-- 이번 단일 컴퓨터 설정에서는 POA IP와 AI-AE 연결 주소를 모두 loopback으로 맞추지만,
-  두 설정은 의미가 다르며 일반적으로 같은 값이어야 하는 것은 아닙니다.
+포트 기본 예시는 MEC의 MN-CSE `3000`, Monitoring의 IN-CSE `3001`, Dashboard `8000`,
+AI-AE `8001`, Mock PLC `9001`입니다. 포트는 배포 설정 및 실행 인자에 따라 달라질 수 있으므로
+실제 `.env` 값과 방화벽 정책을 확인합니다.
 
-## 고정 리소스와 DB 배치
+## 데이터/영속성 경계
 
-`MN-CSE/data.db`는 빈 DB가 아니라 CSE Base 및 관련 리소스와 여섯 FlexContainer를 포함한
-seed DB입니다. AI-AE `.env`의 Device1~Device6 Resource ID는 seed의 ID와 모두 일치하며,
-각 FlexContainer의 custom field도 AI-AE payload와 일치합니다.
-
-TinyIoT의 `init_dbp()`는 현재 작업 디렉터리의 `data.db`를 열고 빠진 테이블을 생성합니다.
-빈 DB에 기존 Resource를 자동 복원하지는 않습니다. `init_server()`는 CSE Base가 없을 때
-Base를 만들지만 여섯 custom FlexContainer를 생성하지 않습니다.
-
-따라서 seed와 runtime DB 분리가 적절합니다. `scripts/run.py`는 seed를 첫 실행에만
-`runtime/data.db`로 복사하고, 이후 runtime DB를 유지합니다. `data.db`는 ID가 고정된
-초기 템플릿으로 보존해야 합니다.
-
-## 빌드 구성
-
-`configure.ac`는 `AC_CONFIG_HEADERS([config.h])` 및 `AC_CONFIG_FILES([Makefile])`를
-선언하므로 전통적인 Autoconf 흐름에서는 `config.h.in` 및 `Makefile.in`에서 두 파일이
-생성됩니다. 다만 기존 configure 옵션은 Base SP ID/RVI를 받지 않고, `autogen.sh`는
-대화형이며 기존 `Makefile.in`도 현재 SQLite/웹소켓 소스 구성과 맞지 않았습니다.
-
-통합 실행은 이를 피하도록 `MN-CSE/scripts/build.py`가 루트 `.env`를 읽고
-`config.h.in`, `Makefile.in`을 기반으로 `config.h`, `Makefile`을 생성한 다음 `make`를
-실행합니다. 즉 현재 지원되는 빌드 진입점은 Autoconf `autogen.sh`가 아니라 이 Python
-스크립트입니다. 자동 생성된 `config.h`는 직접 수정하지 않습니다. 생성 파일은 MN-CSE
-`.gitignore`에 포함됩니다.
+- `MN-CSE/data.db`: Device1~Device6 및 Base 정보가 들어 있는 Seed DB. 직접 수정하지 않습니다.
+- MEC Package의 `runtime/data.db`: 최초 실행에만 Seed를 복사하고 이후에는 보존합니다.
+- IN-CSE의 runtime DB: CSE 시작 시 runtime working directory에서 생성/사용합니다.
+- Dashboard SQLite: `PG_DB_PATH`가 가리키는 runtime 파일에 저장합니다.
+- 로그와 PID 파일은 패키지별 `runtime/logs`와 `runtime/pid`에 둡니다.
+- 모델 파일은 AI-AE 실행 파일과 별도로 패키지의 `models/`에 포함됩니다.
 
 ## 현재 범위 밖
 
-- Dashboard와의 API/조회 프로토콜
-- IN-CSE, Registrar CSE, Remote CSE 등록
-- 다중 MEC Discovery 및 MEC Registry
-- 자동 Resource ID 할당
-- Docker 및 Compose
+- 다중 MEC discovery, Registry/IN-CSE 기반 MEC 선택, failover
+- 인증/인가 정책의 운영 승인, TLS 종단 및 인증서 자동 갱신
+- Windows/macOS 및 ARM 플랫폼의 패키지 지원
+- 실환경에서 검증되지 않은 자동 기동·재부팅 복구

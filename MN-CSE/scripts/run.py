@@ -6,11 +6,12 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 
 MN_CSE_DIR = Path(__file__).resolve().parents[1]
-RUNTIME_DIR = MN_CSE_DIR / "runtime"
+RUNTIME_DIR = Path(os.environ.get("TINYIOT_RUNTIME_DIR", str(MN_CSE_DIR / "runtime"))).expanduser().resolve()
 SEED_DB = MN_CSE_DIR / "data.db"
 SERVER = MN_CSE_DIR / "server"
 SDT_SOURCE = MN_CSE_DIR / "sdt_definitions"

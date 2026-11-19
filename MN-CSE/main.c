@@ -129,6 +129,27 @@ int call_stop = 0;
 // waits, which needs exactly this elapsed-time detection.
 pthread_t ts_monitor;
 int ts_monitor_thread_id = -1;
+static pthread_t remote_cse_worker;
+static int remote_cse_worker_started = 0;
+
+static void *remote_cse_registration_worker(void *unused)
+{
+	(void)unused;
+	int previous_state = -1;
+	while (!terminate)
+	{
+		int ready = register_remote_cse() == 0 && create_local_csr() == 0;
+		if (ready != previous_state)
+		{
+			logger("MAIN", ready ? LOG_LEVEL_INFO : LOG_LEVEL_WARN,
+				   ready ? "Remote CSE registration is ready" : "Remote CSE is unavailable; registration will retry");
+			previous_state = ready;
+		}
+		for (int second = 0; second < 15 && !terminate; second++)
+			sleep(1);
+	}
+	return NULL;
+}
 
 #ifdef ENABLE_MQTT
 pthread_t mqtt;
@@ -264,6 +285,13 @@ int main(int argc, char **argv)
 	{
 		logger("MAIN", LOG_LEVEL_ERROR, "CSE bootstrap failed");
 		return 0;
+	}
+	if ((SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE) && remote_cse_is_configured())
+	{
+		if (pthread_create(&remote_cse_worker, NULL, remote_cse_registration_worker, NULL) == 0)
+			remote_cse_worker_started = 1;
+		else
+			logger("MAIN", LOG_LEVEL_ERROR, "Remote CSE registration retry thread could not start");
 	}
 
 #ifdef ENABLE_MQTT
@@ -501,6 +529,7 @@ void stop_server(int sig)
 		return;
 	}
 	call_stop = 1;
+	terminate = 1;
 
 	logger("MAIN", LOG_LEVEL_INFO, "Shutting down server...");
 
@@ -535,8 +564,12 @@ void stop_server(int sig)
 	if (ts_monitor_thread_id == 0)
 	{
 		logger("MAIN", LOG_LEVEL_INFO, "Stopping TS monitoring...");
-		terminate = 1;
 		pthread_join(ts_monitor, NULL);
+	}
+	if (remote_cse_worker_started)
+	{
+		pthread_join(remote_cse_worker, NULL);
+		remote_cse_worker_started = 0;
 	}
 
 	logger("MAIN", LOG_LEVEL_INFO, "Closing DB...");

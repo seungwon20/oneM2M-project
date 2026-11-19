@@ -190,57 +190,54 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
  */
 RTNode *find_csr_rtnode_by_uri(char *uri)
 {
-    char *uriPtr;
-    // RTNode *rtnode = rt->cb->child, *parent_rtnode = NULL;
     if (!uri)
         return NULL;
-    ResourceAddressingType RAT = checkResourceAddressingType(uri);
 
-    char *target_uri = NULL;
-    char *ptr = NULL;
-    if (RAT == SP_RELATIVE) {
-        target_uri = strdup(uri);
-        ptr = strtok_r(target_uri + 1, "/", &uriPtr);
-    } else if (RAT == ABSOLUTE) {
-        // check if the uri is absolute and starts with the local CSE SP ID
-        if (isSPIDLocal(target_uri)) {
-            ptr = strchr(uri + 2, '/');
-            target_uri = strdup(ptr);
-            ptr = strtok_r(target_uri + 1, "/", &uriPtr);
-        } else {
-            target_uri = strdup(uri);
-            ptr = strchr(target_uri+2, '/');
-            ptr = strtok_r(ptr+1, "/", &uriPtr);
-        }
-    } else {
-        free(target_uri);
-        return NULL;
+    ResourceAddressingType rat = checkResourceAddressingType(uri);
+    const char *segment = NULL;
+    if (rat == SP_RELATIVE)
+    {
+        segment = uri + 1;
     }
-    if (!ptr)
+    else if (rat == ABSOLUTE && !isSPIDLocal(uri))
+    {
+        const char *sp_id_end = strchr(uri + 2, '/');
+        if (sp_id_end)
+            segment = sp_id_end + 1;
+    }
+    if (!segment || !segment[0])
         return NULL;
+
+    const char *segment_end = strchr(segment, '/');
+    size_t segment_length = segment_end ? (size_t)(segment_end - segment) : strlen(segment);
+    char *target_csi = malloc(segment_length + 2);
+    if (!target_csi)
+        return NULL;
+    target_csi[0] = '/';
+    memcpy(target_csi + 1, segment, segment_length);
+    target_csi[segment_length + 1] = '\0';
 
     NodeList *csrlist = rt->csr_list;
-
     while (csrlist)
     {
-        // logger("UTIL", LOG_LEVEL_DEBUG, "csrlist->uri : %s", csrlist->uri);
-        char *csi = cJSON_GetObjectItem(csrlist->rtnode->obj, "csi")->valuestring;
-        if (!strcmp(csi, target_uri))
+        cJSON *csi_item = cJSON_GetObjectItem(csrlist->rtnode->obj, "csi");
+        if (csi_item && cJSON_IsString(csi_item) && !strcmp(csi_item->valuestring, target_csi))
             break;
 
         cJSON *dcse_list = cJSON_GetObjectItem(csrlist->rtnode->obj, "dcse");
         cJSON *dcse = NULL;
         cJSON_ArrayForEach(dcse, dcse_list)
         {
-            if (!strcmp(cJSON_GetStringValue(dcse), target_uri))
+            const char *dcse_value = cJSON_GetStringValue(dcse);
+            if (dcse_value && !strcmp(dcse_value, target_csi))
                 break;
         }
-        if (dcse) break;
+        if (dcse)
+            break;
         csrlist = csrlist->next;
     }
 
-    free(target_uri);
-    logger("UTIL", LOG_LEVEL_DEBUG, "find_csr_rtnode_by_uri: %s", rt->registrar_csr ? rt->registrar_csr->uri : "NULL");
+    free(target_csi);
     return csrlist ? csrlist->rtnode : rt->registrar_csr;
 }
 

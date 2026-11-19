@@ -111,7 +111,10 @@ def test_critical_onem2m_notification():
 
 def test_mn_cse_devices_endpoint(monkeypatch):
     import app as app_module
-    monkeypatch.setattr(app_module, 'MN_CSE_URL', 'http://mn-cse.test:3000')
+    monkeypatch.setattr(app_module, 'IN_CSE_URL', 'http://in-cse.test:3001')
+    monkeypatch.setattr(app_module, 'MN_CSE_ID', 'tinyiot')
+    monkeypatch.setattr(app_module, 'IN_CSE_ORIGIN', 'dashboard-test')
+    monkeypatch.setattr(app_module, 'IN_CSE_RVI', '3')
     def fake_fetch(device_id):
         return {
             'device_id': device_id,
@@ -123,6 +126,7 @@ def test_mn_cse_devices_endpoint(monkeypatch):
             'fresh': True,
         }
     monkeypatch.setattr(app_module, '_fetch_onem2m_device', fake_fetch)
+    monkeypatch.setattr(app_module, '_mn_cache', app_module._poll_mn_cse_once())
     response = client.get('/api/onem2m/devices')
     assert response.status_code == 200
     body = response.json()
@@ -130,6 +134,42 @@ def test_mn_cse_devices_endpoint(monkeypatch):
     assert body['success_count'] == 6
     assert [item['device_id'] for item in body['devices']] == [f'Device{i}' for i in range(1, 7)]
     assert body['devices'][4]['data']['distance_cm'] == 88.8
+
+
+def test_mn_cse_device_uses_in_cse_sp_relative_route(monkeypatch):
+    import json
+    import app as app_module
+
+    monkeypatch.setattr(app_module, 'IN_CSE_URL', 'http://in-cse.test:3001')
+    monkeypatch.setattr(app_module, 'MN_CSE_ID', '/tinyiot/')
+    monkeypatch.setattr(app_module, 'IN_CSE_ORIGIN', 'dashboard-test')
+    monkeypatch.setattr(app_module, 'IN_CSE_RVI', '3')
+    captured = {}
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self, _limit):
+            return json.dumps({'eg:Device1': {'rn': 'Device1', 'ty': 28}}).encode()
+
+    def fake_urlopen(request, timeout):
+        captured['url'] = request.full_url
+        captured['headers'] = request.headers
+        captured['timeout'] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(app_module.urllib.request, 'urlopen', fake_urlopen)
+    result = app_module._fetch_onem2m_device('Device1')
+
+    assert result['ok'] is True
+    assert captured['url'] == 'http://in-cse.test:3001/~/tinyiot/Device1'
+    assert captured['headers']['X-m2m-origin'] == 'dashboard-test'
 
 
 def test_mn_cse_device_unwrap():
