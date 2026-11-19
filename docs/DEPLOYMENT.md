@@ -1,185 +1,197 @@
-# AI-AE + MN-CSE 실제 실행 가이드
+# AI-AE + MN-CSE WSL 실행 가이드
 
-## 현재 검증된 배치
+## 실행 구성
 
-단일 컴퓨터에서 AI-AE와 TinyIoT MN-CSE를 실행합니다.
+개발과 실동작 검증은 하나의 WSL Ubuntu 환경에서 수행합니다. TinyIoT MN-CSE, AI-AE,
+Mock PLC, Mock Sensor Sender와 pytest 모두 같은 WSL 배포판을 사용합니다.
 
-| 컴포넌트 | 실행 위치 | 포트 | 목적 |
-|---|---|---:|---|
-| TinyIoT MN-CSE | WSL/Linux | TCP HTTP `3000` | oneM2M 리소스 저장 및 update 처리 |
-| AI-AE | Windows Python 또는 같은 Linux 환경 | HTTP `8001` | 센서 입력, 위험도 판단, CSE update |
-| Mock PLC | 선택적 데모 프로세스 | TCP `9001` | CRITICAL STOP 동작 모의 |
+| 구성요소 | 실행 주소/포트 | 설명 |
+|---|---|---|
+| TinyIoT MN-CSE | `0.0.0.0:3000` | HTTP listener |
+| AI-AE | `127.0.0.1:8001` | FastAPI 센서 수신 및 ML 위험도 판정 |
+| Mock PLC | `127.0.0.1:9001` | 선택적 CRITICAL STOP 시뮬레이션 |
 
-Dashboard, IN-CSE, 다중 MEC 등록/Discovery, Docker Compose는 이번 구성에 포함되지 않습니다.
+Dashboard, IN-CSE, 다중 MEC Discovery와 Docker Compose는 이 검증 범위에 포함되지 않습니다.
+현재 checkout이 `/mnt/c/` 아래라면 빌드와 Python 설치가 느릴 수 있습니다. 새 checkout은
+`~/projects/oneM2M-project` 같은 WSL Linux 파일시스템 경로를 권장하지만, 기존 작업 디렉터리를
+임의로 이동하거나 덮어쓰지 마세요.
 
-## 전제 조건
+## 1. WSL 의존성 및 AI-AE 가상환경
 
-MN-CSE는 WSL/Linux에서 빌드합니다. 필요한 도구/라이브러리:
-
-- Python 3
-- GCC와 GNU Make
-- pkg-config
-- OpenSSL 개발 파일
-- libwebsockets 개발 파일
-
-Ubuntu 계열에서는 시스템 관리자 권한으로 필요한 패키지를 설치합니다.
+필요한 시스템 도구는 Python 3, venv, GCC, GNU Make, pkg-config, OpenSSL 개발 파일과
+libwebsockets 개발 파일입니다. 누락된 경우 WSL 터미널에서 설치합니다.
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential pkg-config libssl-dev libwebsockets-dev python3
+sudo apt-get install -y build-essential pkg-config libssl-dev libwebsockets-dev python3-venv
 ```
 
-## 1. 프로젝트 루트 `.env` 준비
-
-`.env.example`을 참고해 루트 `.env`에 AI-AE Originator와 6개 Resource ID를 준비합니다.
-실제 값은 로그나 문서에 복사하지 않습니다.
-
-최초 통합 환경에서는 WSL 프로젝트 루트에서 다음 명령으로 확인된 로컬 TinyIoT 값과
-AI-AE 연결 주소를 설정할 수 있습니다.
+프로젝트 루트에서 AI-AE 가상환경을 만들고 모든 Python 요구사항을 설치합니다.
 
 ```bash
+cd AI-AE
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+scikit-learn 버전은 WSL에서 생성한 모델과 맞추어 `requirements.txt`에서 고정합니다.
+
+## 2. 프로젝트 루트 `.env`
+
+`.env.example`을 참고해 루트 `.env`를 준비합니다. `.env` 실제 값은 문서, 화면 출력 또는
+로그에 복사하지 않습니다. 최초 설정은 기존 Originator/Resource ID를 보존하는 옵션을 사용할
+수 있습니다.
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
 python3 MN-CSE/scripts/build.py --init-local-env
 ```
 
-옵션은 `CSE_BASE_URL`, `CSE_BASE_NAME`, `CSE_RVI`와 seed DB에서 읽을 수 있는 CSE Base RI,
-그리고 TinyIoT의 로컬 네트워크 값을 설정합니다. 기존 `AE_ID`, six Resource ID 및
-`TINYIOT_CSE_BASE_SP_ID`는 보존합니다. seed DB에는 SP ID가 없으므로 해당 변수는 별도
-설정이 필요합니다. 일반 빌드는 `.env` 누락이나 placeholder를 오류로 처리합니다.
+seed DB에 없는 `TINYIOT_CSE_BASE_SP_ID`는 별도로 설정해야 합니다. Registrar CSE는 확정되지
+않았으므로 REMOTE_CSE 설정은 채우지 않습니다.
 
-필수 TinyIoT 환경변수:
+## 3. MN-CSE 빌드 및 실행
 
-- `TINYIOT_SERVER_TYPE=mn`
-- `TINYIOT_SERVER_IP`
-- `TINYIOT_SERVER_PORT`
-- `TINYIOT_CSE_BASE_NAME`
-- `TINYIOT_CSE_BASE_RI`
-- `TINYIOT_CSE_BASE_SP_ID`
-
-추가로 `CSE_BASE_URL`, `CSE_BASE_NAME`, `CSE_RVI`, `AE_ID`, AI-AE의 six Resource ID도
-필요합니다. Registrar CSE는 확정되지 않아 REMOTE_CSE 설정은 비워 둡니다.
-
-## 2. MN-CSE 빌드
-
-프로젝트 루트가 현재 디렉터리인 WSL/Linux shell에서 실행합니다.
+프로젝트 루트에서 빌드합니다.
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 python3 MN-CSE/scripts/build.py
 ```
 
-스크립트는 다음을 수행합니다.
+빌드 스크립트는 필수 설정과 MN 모드를 검증하고, `.env`의 CSE Base Name/RI 및 Device1~6
+Resource ID가 seed DB와 일치하는지 검사합니다. FlexContainer custom field도 AI-AE schema와
+비교한 뒤 `config.h` 및 `Makefile`을 생성하고 GCC로 `MN-CSE/server`를 빌드합니다. 생성된
+`config.h`와 `Makefile`은 직접 편집하지 않습니다.
 
-1. `.env`의 필수 설정과 single-MN 모드를 검사합니다.
-2. seed DB의 CSE Base, Device1~6 Resource ID와 custom field를 AI-AE 설정과 대조합니다.
-3. `.env` 및 추적 템플릿에서 `MN-CSE/config.h`, `MN-CSE/Makefile`을 생성합니다.
-4. `make clean`, `make -j2`로 `MN-CSE/server`를 빌드합니다.
-
-`config.h`와 `Makefile`은 생성 파일이며 직접 수정하지 않습니다. `config.h.in`과
-`Makefile.in`이 템플릿입니다. 빌드 결과의 설정 값은 출력하지 않습니다.
-
-## 3. MN-CSE 실행
-
-프로젝트 루트에서 실행합니다.
+다른 WSL 터미널에서 서버를 실행합니다.
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 python3 MN-CSE/scripts/run.py
 ```
 
-첫 시작에 `MN-CSE/data.db`를 `MN-CSE/runtime/data.db`로 복사합니다. 다음 시작에서는 runtime
-DB가 이미 있으면 seed로 덮어쓰지 않습니다. SDT definition도 runtime 디렉터리에 복사한 뒤
-서버를 실행합니다. 정지하려면 `Ctrl+C`를 누릅니다.
+첫 시작에 runtime DB가 없을 때만 `MN-CSE/data.db`를 `MN-CSE/runtime/data.db`로 복사합니다.
+기존 runtime DB는 덮어쓰지 않습니다. SDT definition도 runtime 디렉터리에 복사합니다.
+Seed DB는 읽기 전용 기준 데이터로 유지합니다.
 
-### 주소 해석
+`httpd.c` listener는 `0.0.0.0`에 bind합니다. `TINYIOT_SERVER_IP`와 `TINYIOT_SERVER_PORT`는
+`util.c`가 CSE POA에 광고하는 값이며, AI-AE의 로컬 접속 URL은 별도
+`http://127.0.0.1:3000`입니다.
 
-- `httpd.c`는 listener를 `0.0.0.0`에 bind합니다.
-- `TINYIOT_SERVER_IP`는 `util.c`가 CSE Base의 POA에 기록하는 광고 IP입니다.
-- `TINYIOT_SERVER_PORT`는 listener와 POA port입니다.
-- AI-AE는 별도 `CSE_BASE_URL=http://127.0.0.1:3000`로 연결합니다.
+## 4. CSE Base 및 Device1~6 확인
 
-동일 Windows/WSL 컴퓨터에서 확인된 구성에서는 Windows 측 `127.0.0.1:3000`으로 WSL 서버에
-접속할 수 있었습니다. 다른 네트워크 배치에서는 loopback 대신 AI-AE에서 접근 가능한 주소를
-설정하고 POA 광고 주소와 용도를 구분합니다.
+MN-CSE 실행 중 AI-AE 가상환경에서 read-only 검증기를 실행합니다.
 
-## 4. CSE 상태 및 리소스 확인
-
-MN-CSE 실행 로그에 DB 초기화, SDT definition 로드 및 HTTP server 시작이 표시되어야 합니다.
-Originator 값을 문서나 셸 이력에 복사하지 않도록, 실제 Base 및 Resource GET 검증은
-AI-AE의 설정 파일을 읽는 스크립트로 수행합니다.
-
-```powershell
+```bash
 cd AI-AE
-python tests\check_cse_connection.py
+source .venv/bin/activate
+python tests/check_cse_connection.py
 ```
 
-CSE Base 응답은 HTTP `200`, `X-M2M-RSC: 2000`이어야 합니다. 이는 HTTP listener 및
-Base 조회 확인이며 AI-AE update 성공 확인과는 별도입니다.
+검증기는 TCP 연결, CSE Base GET, HTTP `200`, `X-M2M-RSC: 2000`, Device1~6의 실제 RI 일치,
+FlexContainer type/wrapper와 custom field schema를 확인합니다. 출력에는 `.env` 값이나
+Resource ID를 표시하지 않고 판정 결과만 표시합니다.
 
-## 5. AI-AE 실행
+## 5. Mock PLC 실행
 
-PowerShell에서 프로젝트의 `AI-AE` 디렉터리로 이동합니다.
+CRITICAL STOP 테스트를 한다면 **AI-AE보다 먼저** 별도 WSL 터미널에서 실행합니다.
 
-```powershell
+```bash
 cd AI-AE
-python -m pip install -r requirements.txt
-python -m uvicorn mec_safety.app:app --host 127.0.0.1 --port 8001
-```
-
-AI-AE는 프로젝트 루트 `.env`를 `python-dotenv`로 읽습니다. 상태 endpoint:
-
-```powershell
-curl.exe http://127.0.0.1:8001/health
-```
-
-연결 검증 스크립트는 `.env` 값을 읽고 CSE Base와 여섯 FlexContainer에 GET을 보내며,
-Resource ID/schema를 검증합니다.
-
-성공 결과는 TCP 연결, CSE Base GET 및 여섯 리소스 조회/schema 검사 성공입니다.
-
-## 6. Mock Sensor 데이터로 update 확인
-
-AI-AE 디렉터리의 별도 PowerShell에서 실행합니다.
-
-```powershell
-python -m mec_safety.send_mock_data --once
-```
-
-sender는 Device1, Device2, Device4, Device5, Device3 순서로 샘플을 전송합니다. 각 센서 update의
-응답에서 `Layer2 success=True`, `RSC=2004`를 확인합니다. 마지막 Device3 요청에서 추론이
-실행되며 `Device6 success=True`, `RSC=2004`이면 위험도도 CSE에 update된 것입니다.
-
-실제 동작은 runtime DB를 변경합니다. 테스트 전후 DB 상태가 필요하면 seed DB가 아니라
-`MN-CSE/runtime/data.db`를 확인합니다.
-
-연속 전송:
-
-```powershell
-python -m mec_safety.send_mock_data --interval-seconds 1
-```
-
-종료는 `Ctrl+C`입니다. 실제 MN-CSE에 데이터를 쓰므로 mock 데이터 실행에 주의합니다.
-
-## 7. 선택적 Mock PLC
-
-AI-AE 프로세스 시작 시 PLC 연결이 필요하므로 테스트 전에 별도 터미널에서 시작합니다.
-
-```powershell
-cd AI-AE
+source .venv/bin/activate
 python -m mec_safety.demo_plc_server
 ```
 
-모의 서버는 `127.0.0.1:9001`에서 동작합니다. Demo PLC 주소/포트는 현재 환경변수로 바뀌지
-않으며, 실제 PLC에 연결하기 전에 안전 제어 경로를 별도로 검증해야 합니다.
+Mock PLC는 `127.0.0.1:9001`에서 연결을 기다립니다.
 
-## DB 복구와 보존
+## 6. AI-AE 실행 및 상태 확인
 
-- `MN-CSE/data.db`: 고정 Resource ID를 포함한 seed. 실행 프로세스에 직접 사용하지 않습니다.
-- `MN-CSE/runtime/data.db`: 실제 실행 시 update되는 런타임 DB.
-- `run.py`는 runtime DB를 자동 초기화하거나 덮어쓰지 않습니다.
-- 새 배포에는 seed DB를 별도로 보존/배포해야 기존 ID를 재현할 수 있습니다.
-- 빈 DB는 테이블은 만들지만 Device1~Device6를 재생성하지 않으므로 seed 없이 운영하지 않습니다.
+다른 WSL 터미널에서 AI-AE를 실행합니다.
 
-런타임 DB 교체 또는 초기화는 데이터를 지우는 작업이므로 필요한 백업 후 운영자가 별도로
-결정해야 합니다. 자동 초기화 명령은 제공하지 않습니다.
+```bash
+cd AI-AE
+source .venv/bin/activate
+python -m uvicorn mec_safety.app:app --host 127.0.0.1 --port 8001
+```
 
-역할별 독립 배포용 MEC 패키지 빌드 및 시작/종료 절차는 [패키징 가이드](PACKAGING.md)를
-참고하세요. 현재 자동 패키징 대상은 Linux x86_64 MEC Package이며, Dashboard 소스는 저장소에
-통합되지 않아 Dashboard Package 및 두 컴퓨터 간 실네트워크 검증은 아직 제공하지 않습니다.
+앱 시작 시 Mock PLC 연결을 시도합니다. health 응답은 별도 WSL 터미널에서 확인합니다.
+
+```bash
+curl -fsS http://127.0.0.1:8001/health
+```
+
+## 7. Mock Sensor 및 실제 update
+
+AI-AE 디렉터리의 별도 WSL 터미널에서 한 샘플을 보냅니다.
+
+```bash
+cd AI-AE
+source .venv/bin/activate
+python -m mec_safety.send_mock_data --once
+```
+
+sender는 Device1, Device2, Device4, Device5, Device3 순서로 측정 feature만 전송합니다.
+CSV의 `risk_level` 라벨은 요청에 넣지 않습니다. 각 센서 update는 HTTP `200`,
+`Layer2 success=True`, `RSC=2004`이어야 합니다. 마지막 Device3 요청 뒤 ML 예측과 Device6
+Risk update(`success=True`, `RSC=2004`)를 확인합니다. 연속 전송은 `--once`를 빼고
+`--interval-seconds 1`을 지정합니다.
+
+Mock Sensor는 실제 runtime DB를 변경합니다. 데이터 확인은 `MN-CSE/runtime/data.db`를 기준으로
+하고 `MN-CSE/data.db` seed는 수정하지 않습니다.
+
+## 8. 재현 가능한 통합 확인 및 단위 테스트
+
+세 서비스가 모두 실행 중일 때 프로젝트 루트에서 통합 검증기를 실행합니다.
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+bash scripts/verify-mec.sh
+```
+
+이 검증기는 AI-AE health, CSE 연결과 리소스 schema, Mock Sensor 1회 전송, Device6 update,
+runtime DB 변경 및 seed DB 불변을 확인합니다. 이미 실행 중인 서비스를 종료하지 않고 DB도
+초기화하지 않습니다. 모델이 예측한 CRITICAL 입력이 있을 때만 PLC `STOP_ACCEPTED`와
+`STOPPED` 응답을 검증하며, 해당 입력이 없으면 미실행으로 표시합니다.
+
+단위 테스트는 통합 검증과 별도로 실행합니다.
+
+```bash
+cd AI-AE
+source .venv/bin/activate
+python -m pytest -q
+```
+
+pytest mock transport 테스트는 실제 MN-CSE에 쓰지 않습니다. 통합 검증의 Mock Sensor 단계는
+실제 runtime DB를 변경합니다.
+
+## 이번 WSL 실동작 검증 결과
+
+- MN-CSE seed 설정/리소스 검증과 GCC 빌드가 성공했고, `run.py`가 runtime DB를 최초 생성한 뒤
+  HTTP server를 시작했습니다. SDT definition 807개(21개 파일)가 로드됐습니다.
+- CSE Base 및 Device1~Device6 GET은 HTTP `200`, RSC `2000`과 RI/schema 검증을 통과했습니다.
+- AI-AE health가 응답했고, 다섯 센서 update와 Device6 Risk update는 HTTP `200`, RSC `2004`로
+  성공했습니다.
+- 일반 mock 샘플의 모델 결과는 `Medium`이었습니다. CSV의 위험도 라벨을 전달하지 않고 feature로
+  예측된 CRITICAL 샘플도 별도로 검증했으며, Device6 update와 Mock PLC의
+  `STOP_ACCEPTED` / `STOPPED` 응답을 확인했습니다.
+- 검증 중 runtime DB는 업데이트됐고 seed DB는 변경되지 않았습니다.
+- pytest 결과: **22 passed**, deprecation warning 1건(Starlette에서 AnyIO alias 사용 관련).
+
+위 결과는 이번 WSL 환경에서 실행한 범위에 한정됩니다. 두 컴퓨터 간 LAN 연결, Dashboard,
+재부팅 후 자동 기동은 검증하지 않았습니다.
+
+## 9. 종료 및 데이터 보존
+
+MN-CSE, AI-AE, Mock PLC는 각자 실행 중인 WSL 터미널에서 `Ctrl+C`로 종료합니다. 주요 포트는
+MN-CSE TCP `3000`, AI-AE HTTP `8001`, Mock PLC TCP `9001`입니다.
+
+- `MN-CSE/data.db`: 고정 Resource ID가 있는 seed DB이며 실행 중 직접 수정하지 않습니다.
+- `MN-CSE/runtime/data.db`: 실제 실행 및 센서 update가 기록되는 런타임 DB입니다.
+- `run.py`는 runtime DB가 이미 있으면 seed로 덮어쓰지 않습니다.
+- DB 초기화 또는 교체는 사용자 데이터 손실을 일으킬 수 있으므로 백업 후 별도로 결정합니다.
+
+독립 Linux x86_64 MEC Package의 빌드·구성 절차는 [패키징 가이드](PACKAGING.md)를 참고하세요.
+Dashboard는 별도 개발 완료 상태이나 소스가 저장소에 통합되지 않아 Dashboard Package 및
+Computer A/B 간 네트워크 통신은 검증 대상이 아닙니다.

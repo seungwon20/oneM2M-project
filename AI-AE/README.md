@@ -28,9 +28,29 @@ Layer 2 server, process, queue, or oneM2M AE registration is involved.
 
 ## Run locally
 
-```powershell
+Run the services and tests inside the same WSL Ubuntu distribution. From the project root:
+
+```bash
+cd AI-AE
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m uvicorn mec_safety.app:app --host 0.0.0.0 --port 8001
+```
+
+Start the optional Mock PLC first in its own WSL terminal:
+
+```bash
+cd AI-AE
+source .venv/bin/activate
+python -m mec_safety.demo_plc_server
+```
+
+Then start AI-AE in another WSL terminal:
+
+```bash
+cd AI-AE
+source .venv/bin/activate
+python -m uvicorn mec_safety.app:app --host 127.0.0.1 --port 8001
 ```
 
 ## Layer 2 configuration
@@ -96,7 +116,9 @@ Content-Type: application/json
 With MEC running on port 8001, send the packaged CSV rows continuously, excluding each row's
 `risk_level` label so the MEC model makes its own prediction:
 
-```powershell
+```bash
+cd AI-AE
+source .venv/bin/activate
 python -m mec_safety.send_mock_data --interval-seconds 1
 ```
 
@@ -114,12 +136,12 @@ use the configured Layer 2 connection and write to the real CSE; press `Ctrl+C` 
   validation only; its predictions and confidence are not validated industrial safety results.
 - No request retries or custom timeout policy are configured.
 - The application tests use HTTPX `MockTransport`; they do not send writes to tinyIoT.
-- The ML sensor-flow smoke test is `pytest -q tests\test_sensor_trigger_engine.py`; it sends
+- The ML sensor-flow smoke test is `python -m pytest -q tests/test_sensor_trigger_engine.py`; it sends
   sensor requests without risk labels and exercises the packaged classifier.
-- A read-only CSE check is available with `python tests\check_cse_connection.py`. It checks
+- A read-only CSE check is available with `python tests/check_cse_connection.py`. It checks
   configuration, TCP, CSE Base retrieval, and the six configured FCNTs using GET only.
-- The CSE and all six FCNT GET requests were reachable in the latest check. The server
-  returned specialized `eg:Device1` through `eg:Device6` wrappers.
+- The CSE check reports Resource ID matches and schema results without printing values loaded
+  from `.env`.
 
 # Option C 기반 아키텍처 적용 및 구성 요소 선택 사유
 

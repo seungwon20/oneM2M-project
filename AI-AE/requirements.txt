@@ -5,4 +5,4 @@ httpx==0.27.2
 python-dotenv
 joblib
 numpy
-scikit-learn
+scikit-learn==1.7.2

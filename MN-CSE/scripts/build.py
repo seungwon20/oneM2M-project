@@ -254,7 +254,7 @@ def generate_build_files(env: dict[str, str], rvi: str) -> None:
         "ALLOW_CIN_RN": "true",
         "DEFAULT_CONSISTENCY_POLICY": "CSY_ABANDON_MEMBER",
         "DEFAULT_DISCOVERY_LIMIT": "150",
-        "LOG_LEVEL": "LOG_LEVEL_DEBUG",
+        "LOG_LEVEL": "LOG_LEVEL_INFO",
         "LOG_BUFFER_SIZE": "MAX_PAYLOAD_SIZE",
         "DEFAULT_DISCOVERY_SORT": "SORT_DESC",
     }

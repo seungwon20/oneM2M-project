@@ -60,21 +60,29 @@ def _validate_config(config: Any) -> tuple[list[str], Any]:
         errors.append("CSE_BASE_URL is empty or missing")
         parsed = None
     else:
-        parsed = urlsplit(raw_url.strip())
+        try:
+            parsed = urlsplit(raw_url.strip())
+        except ValueError:
+            parsed = None
+            errors.append("CSE_BASE_URL is malformed")
+
+        if parsed is None:
+            return errors, None
+
         try:
             valid_port = parsed.port
-        except ValueError as exc:
+        except ValueError:
             valid_port = None
-            errors.append(f"CSE_BASE_URL has an invalid port: {exc}")
+            errors.append("CSE_BASE_URL has an invalid port")
 
         if (
             parsed.scheme not in {"http", "https"}
             or not parsed.hostname
             or parsed.path.startswith("//")
         ):
-            errors.append(f"CSE_BASE_URL is malformed: {raw_url!r}")
+            errors.append("CSE_BASE_URL is malformed")
         elif valid_port is None and parsed.netloc.count(":") > 1 and not parsed.netloc.startswith("["):
-            errors.append(f"CSE_BASE_URL has an invalid authority: {raw_url!r}")
+            errors.append("CSE_BASE_URL has an invalid authority")
 
     for attribute in ("CSE_BASE_NAME", "AE_ID", "CSE_RVI"):
         value = getattr(config, attribute, None)
@@ -102,21 +110,15 @@ def _validate_config(config: Any) -> tuple[list[str], Any]:
 def _tcp_check(host: str, port: int) -> tuple[bool, str]:
     try:
         with socket.create_connection((host, port), timeout=5):
-            return True, f"TCP connection successful to {host}:{port}"
-    except socket.gaierror as exc:
-        return False, f"DNS Resolution Failure: {exc}"
-    except TimeoutError as exc:
-        return False, f"Connection Timeout: {exc}"
-    except ConnectionRefusedError as exc:
-        return False, f"Connection Refused: {exc}"
-    except OSError as exc:
-        if getattr(exc, "winerror", None) == 10051:
-            reason = "Network Unreachable"
-        elif getattr(exc, "winerror", None) == 10065:
-            reason = "Host Unreachable"
-        else:
-            reason = f"Network error ({exc})"
-        return False, f"{reason}: {exc}"
+            return True, "TCP connection successful"
+    except socket.gaierror:
+        return False, "DNS resolution failed"
+    except TimeoutError:
+        return False, "Connection timed out"
+    except ConnectionRefusedError:
+        return False, "Connection refused"
+    except OSError:
+        return False, "Network error"
 
 
 def _response_body(response: httpx.Response) -> Any:
@@ -145,7 +147,7 @@ def _print_resource_result(
 ) -> tuple[bool, bool]:
     if response is None:
         print(
-            f"{name}: RI={resource_id} HTTP=NO RESPONSE RSC=N/A "
+            f"{name}: RI_MATCH=NOT VERIFIED HTTP=NO RESPONSE RSC=N/A "
             "Retrieval=FAIL SchemaValidation=NOT RUN"
         )
         return False, False
@@ -176,12 +178,12 @@ def _print_resource_result(
         for label, valid in retrieval_checks.items()
     )
     print(
-        f"{name}: RI={actual_ri!r} ty={resource_type!r} cnd={cnd!r} "
+        f"{name}: RI match={'PASS' if actual_ri == resource_id else 'FAIL'} "
+        f"ty={resource_type!r} cnd={cnd!r} "
         f"wrapper={wrapper!r} expected_wrapper={expected_wrapper!r} "
         f"fields={custom_fields} missing_fields={missing_fields} "
         f"extra_fields={extra_fields} HTTP={response.status_code} "
         f"RSC={response.headers.get('X-M2M-RSC')!r} "
-        f"request_RI={request_id!r} "
         f"Retrieval={'PASS' if retrieval_ok else 'FAIL'} "
         f"SchemaValidation={'PASS' if schema_ok else 'FAIL'}"
     )
@@ -190,7 +192,6 @@ def _print_resource_result(
             f"  Retrieval checks: {retrieval_status}; "
             f"wrapper_match={wrapper == expected_wrapper}"
         )
-        print(f"  Response body: {body!r}")
     return retrieval_ok, schema_ok
 
 
@@ -204,9 +205,8 @@ def main() -> int:
         print("\nCSE Connection: BLOCKED — configuration must be corrected by its owner.")
         print("No network requests were made.")
         print("\nFlexContainer Retrieval:")
-        for key, name in EXPECTED_NAMES.items():
-            resource_id = getattr(config, "FCNT_RI", {}).get(key, "<missing>")
-            print(f"{name}: RI={resource_id} HTTP=NOT RUN RSC=N/A Result=BLOCKED")
+        for name in EXPECTED_NAMES.values():
+            print(f"{name}: RI match=NOT VERIFIED HTTP=NOT RUN RSC=N/A Result=BLOCKED")
         print("\nFinal Assessment: Unable to assess because configuration preflight failed.")
         return 2
 
@@ -239,13 +239,12 @@ def main() -> int:
             print(
                 f"CSE Base Retrieval: {'PASS' if base_ok else 'FAIL'} "
                 f"(HTTP {base_response.status_code}, "
-                f"RSC={base_response.headers.get('X-M2M-RSC')!r}, "
-                f"body={_response_body(base_response)!r})"
+                f"RSC={base_response.headers.get('X-M2M-RSC')!r})"
             )
             all_http_ok = base_ok
         except httpx.HTTPError as exc:
-            print(f"HTTP Response: FAIL — {exc}")
-            print(f"CSE Base Retrieval: FAIL — {exc}")
+            print(f"HTTP Response: FAIL — {type(exc).__name__}")
+            print(f"CSE Base Retrieval: FAIL — {type(exc).__name__}")
             all_http_ok = False
 
         retrieval_results = []
@@ -266,9 +265,9 @@ def main() -> int:
                 )
             except httpx.HTTPError as exc:
                 print(
-                    f"{name}: RI={resource_id} HTTP=NO RESPONSE "
+                    f"{name}: RI match=NOT VERIFIED HTTP=NO RESPONSE "
                     f"RSC=N/A Retrieval=FAIL SchemaValidation=NOT RUN "
-                    f"Error={exc}"
+                    f"Error={type(exc).__name__}"
                 )
                 retrieval_results.append(False)
                 schema_results.append(False)

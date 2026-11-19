@@ -56,7 +56,7 @@ void serve_forever(const char *PORT)
     }
 
     start_server(PORT);
-    logger("HTTP", LOG_LEVEL_INFO, "Server started %shttp://127.0.0.1:%s%s", "\033[92m", PORT, "\033[0m");
+    logger("HTTP", LOG_LEVEL_INFO, "HTTP server started");
     // Ignore SIGCHLD to avoid zombie threads
     signal(SIGCHLD, SIG_IGN);
     // ACCEPT connections
