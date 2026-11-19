@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#07111f"/>
+  <title>PinchGuard | Industrial Safety Monitoring</title>
+  <link rel="stylesheet" href="/static/styles.css"/>
+</head>
+<body>
+  <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" class="icon-library">
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 21 6v6c0 5-3.5 8.6-9 10-5.5-1.4-9-5-9-10V6z"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><rect x="2.5" y="5" width="14" height="14" rx="2"/><path d="m16.5 10 5-3v10l-5-3"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><path d="M2 12h4l3-7 5 14 3-7h5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 9h18c0-1-3-2-3-9ZM10 21h4"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><circle cx="7" cy="7" r=".8"/><circle cx="7" cy="17" r=".8"/><path d="M12 7h6M12 17h6"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m19 13 2-1-2-1-1-3 1-2-2-2-2 1-3-1-1-2-1 2-3 1-2-1-2 2 1 2-1 3-2 1 2 1 1 3-1 2 2 2 2-1 3 1 1 2 1-2 3-1 2 1 2-2-1-2z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></symbol>
+    <symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.3 3.8 1.8 19a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z"/><path d="M12 9v5m0 4h.01"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-5L3 9m0-6v6h6M4 13a8 8 0 0 0 14 5l3-3m0 6v-6h-6"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></symbol>
+    <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></symbol>
+  </svg>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark"><svg><use href="#i-shield"/></svg></div><div><strong>PINCH<span>GUARD</span></strong><small>INDUSTRIAL SAFETY SYSTEM</small></div></div>
+      <div class="aside-caption">WORKSPACE</div>
+      <nav aria-label="Main navigation">
+        <a href="#overview" class="nav-item active"><svg><use href="#i-grid"/></svg> Overview <span>01</span></a>
+        <a href="#camera" class="nav-item"><svg><use href="#i-video"/></svg> Camera <span>02</span></a>
+        <a href="#sensors" class="nav-item"><svg><use href="#i-activity"/></svg> Sensor Monitoring <span>03</span></a>
+        <a href="#history" class="nav-item"><svg><use href="#i-bell"/></svg> Event Log <span>04</span></a>
+        <a href="#connections" class="nav-item"><svg><use href="#i-server"/></svg> System Connections <span>05</span></a>
+      </nav>
+      <div class="sidebar-lower">
+        <div class="aside-caption">SYSTEM TOPOLOGY</div>
+        <div class="topology"><div><span class="topology-dot"></span><span>CAMERA / SENSOR</span></div><span class="topology-wire"></span><div><span class="topology-dot blue"></span><span>EDGE ANALYTICS</span></div><span class="topology-wire"></span><div><span class="topology-dot muted"></span><span>oneM2M CSE</span></div></div>
+        <div class="sidebar-foot"><span class="round-logo">PG</span><div>PinchGuard PoC<small>v0.1 · Academic prototype</small></div></div>
+      </div>
+    </aside>
+    <main class="workspace" id="overview">
+      <header class="topbar"><div class="breadcrumb">PinchGuard <span>/</span> Monitoring <span>/</span> <b>Overview</b></div><div class="topbar-right"><div class="clock"><svg><use href="#i-clock"/></svg> <span id="clock">--:--:--</span> <span class="timezone">KST</span></div><div class="header-divider"></div><div class="profile-circle">PG</div></div></header>
+      <div class="page-inner">
+        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> INDUSTRIAL OPERATIONS CENTER</div><h1>Real-Time Safety Monitoring Dashboard <span class="heading-version">/ Overview</span></h1><p>Monitor field sensors, edge risk analysis, and oneM2M data in one place.</p></div><div class="toolbar"><div id="mode-indicator" class="mode-indicator"><span class="status-dot"></span> Simulation Mode</div><button id="btn-mode" class="btn btn-muted"><svg><use href="#i-refresh"/></svg> Switch to Live Data</button></div></div>
+        <div class="demo-banner" id="demo-banner"><svg><use href="#i-warning"/></svg><div><b>DEMONSTRATION MODE</b><span>The displayed values are simulated for demonstration. They do not indicate real-world safety performance or equipment protection.</span></div><div class="demo-actions"><button data-scenario="SAFE">Safe</button><button data-scenario="WARNING">Warning</button><button data-scenario="HIGH">High Risk</button><button data-scenario="CRITICAL">Critical</button><button data-scenario="UNKNOWN">Input Failure</button></div></div>
+        <section class="kpi-row" aria-label="Key performance indicators">
+          <article class="metric-card risk-card"><div class="metric-top"><span>Current Risk Level</span><div class="metric-icon"><svg><use href="#i-shield"/></svg></div></div><div id="risk-main" class="metric-big warning">WARNING</div><div id="risk-sub" class="metric-bottom">Latest assessment · Demo</div><div class="metric-accent red-accent"></div></article>
+          <article class="metric-card"><div class="metric-top"><span>Sensor Data Status</span><div class="metric-icon"><svg><use href="#i-activity"/></svg></div></div><div id="sensor-main" class="metric-big">-- <small>sec</small></div><div id="sensor-sub" class="metric-bottom">Time since last sensor reading</div></article>
+          <article class="metric-card"><div class="metric-top"><span>Scene Visualization Status</span><div class="metric-icon"><svg><use href="#i-video"/></svg></div></div><div id="camera-main" class="metric-big">Disconnected</div><div id="camera-sub" class="metric-bottom">Waiting for sensor-driven visualization</div></article>
+          <article class="metric-card"><div class="metric-top"><span>Recorded Risk Events</span><div class="metric-icon"><svg><use href="#i-bell"/></svg></div></div><div id="events-main" class="metric-big">0 <small>events</small></div><div id="events-sub" class="metric-bottom">Including -- CRITICAL / HIGH events</div></article>
+        </section>
+        <div class="main-columns">
+          <div class="left-stack">
+            <section class="panel camera-panel" id="camera"><div class="panel-head"><div><div class="panel-kicker">SENSOR SCENE / CAMERA</div><h2>Field Visualization <span>VIRTUAL-01</span></h2></div><span id="video-status" class="pill offline"><span class="status-dot"></span> Standby</span></div>
+              <div class="camera-stage" id="camera-stage"><img id="camera-image" alt="Latest image uploaded by the camera" hidden />
+                <div class="camera-illustration" id="camera-placeholder"><div class="view-grid"></div><svg class="plant-svg" viewBox="0 0 860 410" aria-hidden="true"><defs><linearGradient id="mach" x1="0" x2="1"><stop offset="0" stop-color="#1b3453"/><stop offset="1" stop-color="#25466c"/></linearGradient></defs><g fill="none" stroke="#4b6f8e" stroke-width="2" opacity=".7"><path d="M28 330H832M80 310V95H177M650 95H804V315"/><path d="M90 100h150m388 0h150"/></g><g transform="translate(180 178)"><rect width="465" height="122" rx="13" fill="url(#mach)" stroke="#3b6785" stroke-width="2"/><rect x="24" y="20" width="416" height="63" rx="6" fill="#0f243d" stroke="#315873"/><g fill="#54738f"><rect x="32" y="27" width="400" height="48" rx="5" fill="#284968"/><circle cx="60" cy="50" r="19" fill="#142c45" stroke="#7c9db0" stroke-width="4"/><circle cx="400" cy="50" r="19" fill="#142c45" stroke="#7c9db0" stroke-width="4"/></g><path d="M61 52h338" stroke="#8cabb9" stroke-width="4" stroke-dasharray="13 8"/><rect x="48" y="102" width="35" height="39" fill="#1e3856"/><rect x="375" y="102" width="35" height="39" fill="#1e3856"/></g><g transform="translate(425 65)" stroke="#b1c9d7" stroke-width="3"><circle cx="25" cy="15" r="16" fill="#7596a9"/><path d="M12 43 Q25 29 39 43L46 97 55 160M24 65l-34 35M40 62l35 23M20 96l-25 74" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g><rect x="346" y="116" width="200" height="176" rx="12" fill="#eaa641" fill-opacity=".04" stroke="#f1b35b" stroke-width="2" stroke-dasharray="8 7"/><path d="m346 118 12-1m188 175-12 1" stroke="#ffc478" stroke-width="5"/></svg><div class="demo-camera-label"><svg><use href="#i-video"/></svg> DEMO VISUALIZATION <span>Not actual camera footage</span></div></div>
+                <!-- PINCHGUARD_SENSOR_SCENE_V1: sensor-driven schematic, not actual footage -->
+<div id="pg-scene-overlay" class="pg-scene-overlay" hidden aria-label="Sensor-driven schematic scene (not actual camera footage)">
+  <div id="pg-scene-zone" class="pg-scene-zone"><span>DANGER ZONE · SCHEMATIC</span></div>
+  <div id="pg-scene-belt" class="pg-scene-belt"></div>
+  <div id="pg-scene-people" class="pg-scene-people" aria-hidden="true"></div>
+  <div class="pg-scene-hud" aria-live="off">
+    <span id="pg-zone-count">ZONE —</span>
+    <span id="pg-total-count">PEOPLE —</span>
+    <span id="pg-motor-state">MOTOR —</span>
+    <span id="pg-scene-distance">DIST —</span>
+  </div>
+  <div class="pg-scene-disclaimer">Illustrative display only · Worker positions are not tracked coordinates</div>
+</div>
+<div class="camera-crosshair top-left"></div><div class="camera-crosshair top-right"></div><div class="camera-crosshair bottom-left"></div><div class="camera-crosshair bottom-right"></div><div class="camera-time"><span class="record-dot"></span><span id="camera-utc">LIVE PREVIEW UNAVAILABLE</span></div>
+              </div><div class="camera-footer"><div><span class="legend-swatch amber"></span><b>Illustrative hazard zone</b> <span class="footer-muted">· Sensor-based schematic · Not actual video</span></div><span id="camera-meta">FRAME — / FPS —</span></div>
+            </section>
+            <section class="panel chart-panel"><div class="panel-head"><div><div class="panel-kicker">SENSOR TELEMETRY</div><h2>Proximity Distance Trend</h2></div><div class="chart-legend"><span class="legend-swatch cyan"></span> Distance (cm) <span class="legend-line"></span> Illustrative thresholds</div></div><div class="chart-region"><canvas id="distance-chart" aria-label="Recent distance sensor readings" role="img"></canvas><div class="chart-empty" id="chart-empty" hidden>No distance readings available</div></div><div class="panel-footnote">The 50 / 100 cm reference lines are illustrative only, not certified industrial safety limits.</div></section>
+            <section class="panel table-panel" id="history"><div class="panel-head"><div><div class="panel-kicker">AUDIT TRAIL</div><h2>Recent Event Log</h2></div><span class="small-count" id="event-count">0 EVENTS</span></div><div class="event-table-wrap"><table><thead><tr><th>Timestamp</th><th>Level</th><th>Event Description</th><th>Source</th><th>Status</th></tr></thead><tbody id="event-table"><tr><td colspan="5" class="empty-table">Loading events...</td></tr></tbody></table></div><div class="panel-footnote">Acknowledging a log entry does not clear a hazard or stop machinery.</div></section>
+          </div>
+          <div class="right-stack">
+            <section class="panel sensors-panel" id="sensors"><div class="panel-head"><div><div class="panel-kicker">FIELD SENSORS</div><h2>Live Field Sensor Status</h2></div><span id="sensor-link" class="tiny-status">Waiting for connection</span></div><div class="sensor-tiles">
+              <div class="sensor-tile"><div class="sensor-name">TOF DISTANCE <span class="tile-icon">↗</span></div><div class="sensor-value"><span id="distance">—</span><small>cm</small></div><div id="distance-desc" class="sensor-description">No data</div></div>
+              <div class="sensor-tile"><div class="sensor-name">LIGHT BARRIER <span class="tile-icon">◈</span></div><div class="sensor-value smaller" id="beam">—</div><div class="sensor-description">Photoelectric barrier sensor</div></div>
+              <div class="sensor-tile"><div class="sensor-name">MOTOR SPEED <span class="tile-icon">◌</span></div><div class="sensor-value"><span id="rpm">—</span><small>rpm</small></div><div class="sensor-description">Hall-effect sensor / rotation detection</div></div>
+              <div class="sensor-tile"><div class="sensor-name">MACHINE STATUS <span class="tile-icon">⚙</span></div><div class="sensor-value smaller" id="machine">—</div><div class="sensor-description">Machine running status</div></div>
+            </div><div class="sensor-foot"><span>Latest Source Device</span><b id="device-name">Disconnected</b></div></section>
+            <section class="panel mn-devices-panel" id="mn-devices"><div class="panel-head"><div><div class="panel-kicker">oneM2M · DATA INTEGRATION</div><h2>Field Device Data <span>Device 1–6</span></h2></div><span id="mn-cse-status" class="tiny-status">조회 대기</span></div><div id="mn-device-grid" class="mn-device-grid"><div class="mn-device-empty">MN-CSE 데이터 조회 Standby</div></div><div class="panel-footnote" id="mn-cse-footnote">서버 측에서 MN-CSE를 직접 조회합니다. 데이터 최신성은 원본 received_at / evaluated_at 기준입니다.</div></section>
+            <section class="panel decision-panel"><div class="panel-head"><div><div class="panel-kicker">RISK ASSESSMENT</div><h2>Integrated Risk Assessment</h2></div><svg class="decision-icon"><use href="#i-shield"/></svg></div><div class="risk-display"><div class="risk-ring"><div class="risk-ring-inner"><svg><use href="#i-activity"/></svg></div></div><div><div class="risk-caption">LATEST DECISION</div><div id="decision-label" class="decision-label">UNKNOWN</div><div id="decision-description" class="decision-description">No recent valid risk assessment</div></div></div><div class="decision-fields"><div><span>Assessment Source</span><b id="decision-source">—</b></div><div><span>Time Since Assessment</span><b id="decision-age">—</b></div><div><span>Control Status</span><b>Demo only · Not connected</b></div></div><div class="decision-notice"><svg><use href="#i-warning"/></svg><span>AI inference and real-world safety stops require separate validation.</span></div></section>
+            <section class="panel connection-panel" id="connections"><div class="panel-head"><div><div class="panel-kicker">SYSTEM CONNECTIVITY</div><h2>Service Connectivity</h2></div></div><div class="connection-items"><div><div class="conn-icon"><svg><use href="#i-server"/></svg></div><div><b>Local Edge API</b><small>FastAPI · Current server</small></div><span class="conn-state ok">Operational</span></div><div><div class="conn-icon"><svg><use href="#i-video"/></svg></div><div><b>Video Ingestion</b><small>HTTP JPEG /api/frame</small></div><span id="conn-camera" class="conn-state">Disconnected</span></div><div><div class="conn-icon"><svg><use href="#i-activity"/></svg></div><div><b>Sensor Collector</b><small>HTTP /api/sensor</small></div><span id="conn-sensor" class="conn-state">Disconnected</span></div><div><div class="conn-icon"><svg><use href="#i-bell"/></svg></div><div><b>oneM2M Notifications</b><small>POST /notify</small></div><span id="conn-cse" class="conn-state">Not verified</span></div></div><div class="connection-foot"><b>ETSI MEC Sandbox</b><span>Deployment and integration not validated</span></div></section>
+          </div>
+        </div>
+        <footer class="page-footer"><span>PINCHGUARD · Integrated Monitoring PoC / NOT A CERTIFIED SAFETY CONTROLLER</span><span id="footer-sync">Last sync —</span></footer>
+      </div>
+    </main>
+  </div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

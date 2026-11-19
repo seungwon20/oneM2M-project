@@ -1,0 +1,168 @@
+[
+  {
+    "type": "eg:Device1",
+    "cnd": "org.edgeguard.Device1",
+    "lname": "Device1",
+    "sdttype": "Device",
+    "attributes": [
+      {
+        "sname": "zone_person_count",
+        "type": "nonNegInteger",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "total_person_count",
+        "type": "nonNegInteger",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "received_at",
+        "type": "dateTime",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "eg:Device2",
+    "cnd": "org.edgeguard.Device2",
+    "lname": "Device2",
+    "sdttype": "Device",
+    "attributes": [
+      {
+        "sname": "weight_kg",
+        "type": "float",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "received_at",
+        "type": "dateTime",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "eg:Device3",
+    "cnd": "org.edgeguard.Device3",
+    "lname": "Device3",
+    "sdttype": "Device",
+    "attributes": [
+      {
+        "sname": "beam_blocked",
+        "type": "boolean",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "received_at",
+        "type": "dateTime",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "eg:Device4",
+    "cnd": "org.edgeguard.Device4",
+    "lname": "Device4",
+    "sdttype": "Device",
+    "attributes": [
+      {
+        "sname": "is_rotating",
+        "type": "boolean",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "speed_rpm",
+        "type": "float",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "received_at",
+        "type": "dateTime",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "eg:Device5",
+    "cnd": "org.edgeguard.Device5",
+    "lname": "Device5",
+    "sdttype": "Device",
+    "attributes": [
+      {
+        "sname": "distance_cm",
+        "type": "float",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "received_at",
+        "type": "dateTime",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "eg:Device6",
+    "cnd": "org.edgeguard.Device6",
+    "lname": "Device6",
+    "sdttype": "Device",
+    "attributes": [
+      {
+        "sname": "risk_level",
+        "type": "string",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "speed_rpm",
+        "type": "float",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "distance_cm",
+        "type": "float",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      },
+      {
+        "sname": "evaluated_at",
+        "type": "dateTime",
+        "oc": "M",
+        "ou": "O",
+        "car": "1"
+      }
+    ],
+    "children": []
+  }
+]

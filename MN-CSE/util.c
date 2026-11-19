@@ -1326,7 +1326,7 @@ bool bootstrap_cse()
 		add_child_resource_tree(rt->cb, acp_rtnode);
 	}
 
-	if (SERVER_TYPE == ASN_CSE)
+	if (SERVER_TYPE == MN_CSE || SERVER_TYPE == ASN_CSE)
 	{
 		if (register_remote_cse() != 0)
 		{

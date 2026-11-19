@@ -19,3 +19,22 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
+# PinchGuard generated files
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.pyc
+*.bak
+core
+core.*
+.venv-win/
+__pycache__/
+.vscode/
