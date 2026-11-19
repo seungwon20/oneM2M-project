@@ -8,7 +8,7 @@ TinyIoT MN-CSE에 oneM2M HTTP Binding으로 저장합니다.
 
 - **AI-AE**: Python/FastAPI 센서 수신, 검증, 위험도 모델 추론, MN-CSE 업데이트
 - **MN-CSE**: `MN-CSE/` 루트에 수정된 TinyIoT C 소스 포함, MN-CSE 모드 실행
-- **Dashboard**: 별도 개발 중이며 현재 저장소에 소스 미포함
+- **Dashboard**: 별도 개발 완료, 현재 저장소에는 아직 미통합
 - 단일 MEC만 대상으로 하며 ID 자동 발견, 다중 MEC 등록/Discovery, Registry는 구현하지 않음
 - 이번 통합 범위에 Docker Compose, IN-CSE 및 Dashboard 실행은 포함하지 않음
 

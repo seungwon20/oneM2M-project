@@ -2,8 +2,8 @@
 
 ## 개발 환경 준비
 
-현재 저장소에는 AI-AE와 TinyIoT MN-CSE 소스가 포함됩니다. Dashboard는 별도 개발 중이며
-소스는 저장소에 없습니다. 통합은 단일 MEC, 고정 CSE Base/Resource ID 구성입니다.
+현재 저장소에는 AI-AE와 TinyIoT MN-CSE 소스가 포함됩니다. Dashboard는 별도 개발 완료 상태이나
+아직 저장소에 통합되지 않았습니다. 통합은 단일 MEC, 고정 CSE Base/Resource ID 구성입니다.
 
 권장 환경:
 

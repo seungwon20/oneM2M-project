@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mec_safety.app import create_app
+from mec_safety.config import Layer2Config
 from mec_safety.layer2 import FCNT_WRAPPERS, Layer2Handoff
 
 
@@ -48,7 +49,7 @@ def test_sensor_post_is_handed_directly_to_layer2_with_schema_timestamp():
     assert len(requests) == 1
     request = requests[0]
     assert request.method == "PUT"
-    assert request.headers["X-M2M-Origin"] == "CAdmin"
+    assert request.headers["X-M2M-Origin"] == Layer2Config.AE_ID
     assert request.headers["X-M2M-RVI"] == "3"
     assert request.headers["X-M2M-RI"] == body["handoff"]["request_id"]
     assert json.loads(request.content) == {

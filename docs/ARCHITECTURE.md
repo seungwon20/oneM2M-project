@@ -8,7 +8,7 @@
 | AI-AE | `AI-AE/` | 센서 API, 입력 검증, 최신 상태, 위험도 추론, oneM2M 업데이트 |
 | MN-CSE | `MN-CSE/` TinyIoT 소스 루트 | oneM2M 리소스 및 센서/위험 데이터 저장 |
 | Mock PLC | AI-AE의 데모 코드 | CRITICAL 시 TCP STOP 요청을 시험하는 선택 컴포넌트 |
-| Dashboard | 별도 개발, 소스 미통합 | 이번 통합/실행 범위 외부 |
+| Dashboard | 별도 개발 완료, 저장소 미통합 | 이번 통합/실행 범위 외부 |
 
 MEC는 실행 인프라/환경이며 AI-AE는 그 환경에 설치되는 애플리케이션입니다.
 현재 구성은 한 컴퓨터에서 AI-AE와 MN-CSE를 실행하는 단일 MEC입니다. CSE 또는 장비의
