@@ -56,5 +56,5 @@ python3 MN-CSE/scripts/run.py
 
 ## Dashboard 및 기타 범위
 
-Dashboard는 별도 개발 중이고 이 저장소에 포함되지 않습니다. IN-CSE, Remote CSE 등록,
+Dashboard는 별도 개발 완료 상태이나 이 저장소에는 아직 통합되지 않았습니다. IN-CSE, Remote CSE 등록,
 다중 MEC discovery, 자동 Resource ID 관리, Docker Compose 또한 현재 구현 범위가 아닙니다.

@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ENV_FILE = PROJECT_ROOT / ".env"
+ENV_FILE = Path(
+    os.environ.get("ONE_M2M_ENV_FILE", str(PROJECT_ROOT / ".env"))
+).expanduser().resolve()
 
 load_dotenv(ENV_FILE, override=False)
 

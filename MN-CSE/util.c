@@ -1236,6 +1236,13 @@ bool init_server()
 {
 	bool setup = false;
 	char poa[128] = { 0 };
+	const char* server_ip = getenv("TINYIOT_SERVER_IP");
+	const char* server_port = getenv("TINYIOT_SERVER_PORT");
+
+	if (!server_ip || !server_ip[0])
+		server_ip = SERVER_IP;
+	if (!server_port || !server_port[0])
+		server_port = SERVER_PORT;
 
 	rt = (ResourceTree*)calloc(1, sizeof(ResourceTree));
 
@@ -1270,7 +1277,7 @@ bool init_server()
 	if (ioctl(s, SIOCGIFADDR, &ifr) < 0)
 	{
 		logger("UTIL", LOG_LEVEL_ERROR, "NIC_NAME is invalid, using SERVER_IP");
-		sprintf(ipstr, "%s", SERVER_IP);
+		snprintf(ipstr, sizeof(ipstr), "%s", server_ip);
 	}
 	else
 	{
@@ -1278,22 +1285,22 @@ bool init_server()
 		logger("UTIL", LOG_LEVEL_INFO, "NIC IP : %s", ipstr);
 	}
 	close(s);
-	sprintf(poa, "http://%s:%s", ipstr, SERVER_PORT);
+	snprintf(poa, sizeof(poa), "http://%s:%s", ipstr, server_port);
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 #endif
-	sprintf(poa, "http://%s:%s", SERVER_IP, SERVER_PORT);
+	snprintf(poa, sizeof(poa), "http://%s:%s", server_ip, server_port);
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 
 #ifdef ENABLE_MQTT
-	sprintf(poa, "mqtt://%s:%d", SERVER_IP, MQTT_PORT);
+	snprintf(poa, sizeof(poa), "mqtt://%s:%d", server_ip, MQTT_PORT);
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 #endif
 
 #ifdef ENABLE_COAP
 #ifdef ENABLE_COAP_DTLS
-	sprintf(poa, "coaps://%s:%d", SERVER_IP, COAP_PORT);
+	snprintf(poa, sizeof(poa), "coaps://%s:%d", server_ip, COAP_PORT);
 #else
-	sprintf(poa, "coap://%s:%d", SERVER_IP, COAP_PORT);
+	snprintf(poa, sizeof(poa), "coap://%s:%d", server_ip, COAP_PORT);
 #endif
 	cJSON_AddItemToArray(poa_obj, cJSON_CreateString(poa));
 #endif

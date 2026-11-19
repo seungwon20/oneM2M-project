@@ -12,6 +12,33 @@ TinyIoT MN-CSE에 oneM2M HTTP Binding으로 저장합니다.
 - 단일 MEC만 대상으로 하며 ID 자동 발견, 다중 MEC 등록/Discovery, Registry는 구현하지 않음
 - 이번 통합 범위에 Docker Compose, IN-CSE 및 Dashboard 실행은 포함하지 않음
 
+## 독립 배포 패키지
+
+MEC Package 빌드 및 서비스 관리 자동화를 구현했습니다. 현재 빌드 대상은 **Linux x86_64**이며
+AI-AE, TinyIoT MN-CSE, 모델, seed DB와 서비스 관리 도구를 한 패키지로 묶습니다.
+
+주요 구현 파일:
+
+- `packaging/mec/build_package.py`: MN-CSE 빌드, AI-AE와 제어 도구 패키징, seed DB·모델·설정 템플릿 수집,
+  패키지 디렉터리와 `.tar.gz` 및 SHA-256 생성
+- `packaging/mec/mec_control.py`: 패키지 설정 생성/검증, 최초 runtime DB 준비,
+  MN-CSE 준비 대기 후 AI-AE 시작, 상태·health check와 종료 관리
+- `packaging/mec/ai_ae_entry.py`: 패키지에 포함되는 AI-AE 실행 진입점
+- `packaging/mec/scripts/`: `configure-mec`, `start-mec`, `stop-mec`, `status-mec`, `healthcheck`
+- `packaging/mec/templates/.env.example`: 패키지별 설정 템플릿
+- `packaging/mec/tests/test_mec_control.py`: 설정 생성 및 검증 테스트
+- `packaging/mec/requirements-build.txt`: 패키지 빌드 의존성
+- `MN-CSE/util.c`: 실행 시 설정된 서버 주소와 포트를 CSE POA에 반영
+
+**검증 현황:** AI-AE와 MEC 패키지 테스트 27개가 통과했고, WSL에서 Linux x86_64용 MEC 패키지 빌드도
+성공했습니다. 다만 새 장비에서 패키지를 풀어 설정·기동·상태 확인·종료하는 설치 수명주기 검증과
+실제 LAN에서의 연결 검증은 아직 완료되지 않았습니다. 현재 저장소나 GitHub Release에는 다운로드용
+패키지 아카이브가 포함되어 있지 않으므로, 아직 “다운로드 후 바로 배포 가능한 릴리스” 상태는 아닙니다.
+빌드·설치 절차와 제한 사항은 [패키징 가이드](docs/PACKAGING.md)를 참고하세요.
+
+Dashboard는 별도 개발 완료 상태이나 소스 코드가 아직 저장소에 통합되지 않아 Dashboard
+Package는 만들지 않습니다. 실제 Computer A/B 네트워크 연동도 아직 검증되지 않았습니다.
+
 ## 아키텍처와 데이터 흐름
 
 ```mermaid
@@ -54,11 +81,21 @@ oneM2M-project/
 │   └── scripts/
 │       ├── build.py
 │       └── run.py
+├── packaging/
+│   └── mec/                       # Linux x86_64 MEC Package 빌드/실행 도구
+│       ├── build_package.py
+│       ├── mec_control.py
+│       ├── ai_ae_entry.py
+│       ├── requirements-build.txt
+│       ├── scripts/               # configure/start/stop/status/healthcheck
+│       ├── templates/.env.example
+│       └── tests/test_mec_control.py
 └── docs/
     ├── ARCHITECTURE.md
     ├── CONFIGURATION.md
     ├── DEPLOYMENT.md
-    └── DEVELOPMENT.md
+    ├── DEVELOPMENT.md
+    └── PACKAGING.md
 ```
 
 MN-CSE 런타임은 seed DB를 직접 수정하지 않도록 `MN-CSE/runtime/data.db`에서 실행됩니다.

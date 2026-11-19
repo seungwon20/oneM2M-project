@@ -179,3 +179,7 @@ python -m mec_safety.demo_plc_server
 
 런타임 DB 교체 또는 초기화는 데이터를 지우는 작업이므로 필요한 백업 후 운영자가 별도로
 결정해야 합니다. 자동 초기화 명령은 제공하지 않습니다.
+
+역할별 독립 배포용 MEC 패키지 빌드 및 시작/종료 절차는 [패키징 가이드](PACKAGING.md)를
+참고하세요. 현재 자동 패키징 대상은 Linux x86_64 MEC Package이며, Dashboard 소스는 저장소에
+통합되지 않아 Dashboard Package 및 두 컴퓨터 간 실네트워크 검증은 아직 제공하지 않습니다.
