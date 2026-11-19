@@ -1,0 +1,83 @@
+#--------------------AI appication 서버 열기---------------------
+1. AI application 설정 파일에 MN-CSE 주소와 각각의 6개 디바이스 ID 넣기
+2.  python -m uvicorn mec_safety.app:app --host 127.0.0.1 --port 8001
+#--------------------PLC 서버 열기------------------------------
+3 python C:\Users\rornf\OneDrive\Desktop\oneM2M\mec_safety\demo_plc_server.py
+9001 에서 열림
+#--------------------mock 데이터 클라이언트 생성-------------------
+4. ython -m mec_safety.send_mock_data --interval-seconds 1
+
+
+              [ Windows Local PC ]
++--------------------------------------------------------+
+|                                                        |
+|  ① Mock Data Client                                    |
+|  python -m mec_safety.send_mock_data                   |
+|                                                        |
+|  - Camera                                              |
+|  - Weight                                              |
+|  - Infrared                                            |
+|  - Encoder                                             |
+|  - Distance                                            |
+|                                                        |
++--------------------------+-----------------------------+
+                           |
+                           | HTTP POST
+                           | 127.0.0.1:8001
+                           v
++--------------------------------------------------------+
+|                                                        |
+|          ② AI Application Server                      |
+|          FastAPI / Uvicorn                             |
+|          127.0.0.1:8001                                |
+|                                                        |
+|   +----------------------+                             |
+|   | Sensor Data          |                             |
+|   | Validation           |                             |
+|   +----------+-----------+                             |
+|              |                                         |
+|              v                                         |
+|   +----------------------+                             |
+|   | Latest Sensor State  |                             |
+|   | Management           |                             |
+|   +----------+-----------+                             |
+|              |                                         |
+|              v                                         |
+|   +----------------------+                             |
+|   | SensorTriggerEngine  |                             |
+|   | Event Trigger        |                             |
+|   | ML Inference         |                             |
+|   +----------+-----------+                             |
+|              |                                         |
+|              v                                         |
+|   +----------------------+                             |
+|   | Risk Assessment      |                             |
+|   | LOW / MEDIUM         |                             |
+|   | HIGH / CRITICAL      |                             |
+|   +----------+-----------+                             |
+|              |                                         |
+|              +----------------------+                  |
+|              |                      |                  |
+|              v                      v                  |
+|   +------------------+    +----------------------+     |
+|   | Layer2Handoff    |    | TCP Client           |     |
+|   |                  |    | Persistent Connection|     |
+|   +--------+---------+    +----------+-----------+     |
+|            |                         |                 |
++------------|-------------------------|-----------------+
+             |                         |
+             | oneM2M HTTP             | TCP
+             |                         | Port 9001
+             v                         v
++-------------------------+  +----------------------------+
+|                         |  |                            |
+|       MN-CSE             |  |    ③ Mock PLC Server       |
+|                         |  |                            |
+|  Camera FlexContainer   |  |    demo_plc_server.py      |
+|  Weight FlexContainer   |  |                            |
+|  Infrared FlexContainer |  |    STOP Command Receive    |
+|  Encoder FlexContainer  |  |             |              |
+|  Distance FlexContainer |  |             v              |
+|  Risk FlexContainer     |  |    Conveyor Stop Simulation|
+|                         |  |                            |
++-------------------------+  +----------------------------+
