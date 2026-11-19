@@ -1,0 +1,27 @@
+# Compiled objects and executables
+*.o
+server
+server_postgresql
+config.h
+Makefile
+configure
+autom4te.cache/
+config.log
+config.status
+
+# Runtime databases and SQLite journal files
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.log
+.DS_Store
+
+# The bundled data.db is the fixed-ID seed required for reproducible setup.
+!data.db
+
+# Writable runtime database and generated runtime files
+runtime/

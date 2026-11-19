@@ -28,15 +28,15 @@ Layer 2 server, process, queue, or oneM2M AE registration is involved.
 
 ## Run locally
 
-```bash
+```powershell
 python -m pip install -r requirements.txt
-python -m uvicorn mec_safety.app:app --host 0.0.0.0 --port 8000
+python -m uvicorn mec_safety.app:app --host 0.0.0.0 --port 8001
 ```
 
 ## Layer 2 configuration
 
-The CSE URL, Base Name, RVI, AE identity, and six Resource IDs are stored in
-`mec_safety/config.py`. Layer 2 uses the resource-specific wrappers observed in the CSE
+The CSE URL, Base Name, RVI, AE identity, and six Resource IDs are loaded from the project-root
+`.env` by `mec_safety/config.py`. Layer 2 uses the resource-specific wrappers observed in the CSE
 GET responses (`eg:Device1` through `eg:Device6`). Resource IDs are URL-encoded and
 appended to the configured CSE URL. The application does not register the AE or create
 resources.

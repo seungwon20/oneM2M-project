@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-import ast
 import json
 import socket
+import sys
 import uuid
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, Dict
 from urllib.parse import quote, urlsplit
 
 import httpx
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from mec_safety.config import Layer2Config
 
 EXPECTED_FIELDS = {
     "device1": {"zone_person_count", "total_person_count", "received_at"},
@@ -37,33 +40,8 @@ EXPECTED_WRAPPERS = {
 }
 
 
-def _load_config_without_importing_application() -> SimpleNamespace:
-    config_path = Path(__file__).resolve().parents[1] / "mec_safety" / "config.py"
-    module = ast.parse(
-        config_path.read_text(encoding="utf-8"), filename=str(config_path)
-    )
-    config_class = next(
-        node
-        for node in module.body
-        if isinstance(node, ast.ClassDef) and node.name == "Layer2Config"
-    )
-    values = {}
-    for node in config_class.body:
-        if isinstance(node, ast.Assign):
-            targets = node.targets
-            value_node = node.value
-        elif isinstance(node, ast.AnnAssign):
-            targets = [node.target]
-            value_node = node.value
-        else:
-            continue
-        for target in targets:
-            if isinstance(target, ast.Name) and value_node is not None:
-                try:
-                    values[target.id] = ast.literal_eval(value_node)
-                except (ValueError, TypeError):
-                    continue
-    return SimpleNamespace(**values)
+def _load_config_without_importing_application() -> type[Layer2Config]:
+    return Layer2Config
 
 
 def _one_m2m_headers(config: Any) -> Dict[str, str]:
