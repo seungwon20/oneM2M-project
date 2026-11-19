@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-
+/packaging/monitoring/dist/
 # Virtual environments
 .venv/
 venv/

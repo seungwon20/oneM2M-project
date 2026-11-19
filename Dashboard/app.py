@@ -38,6 +38,10 @@ MAX_EVENT_BODY = 1_000_000
 # Dashboard reads the remote MN-CSE through the local IN-CSE registrar.
 IN_CSE_URL = os.getenv('PG_IN_CSE_URL', '').rstrip('/')
 MN_CSE_ID = os.getenv('PG_MN_CSE_ID', '').strip('/')
+MN_DEVICE_RIS = {
+    f'Device{i}': os.getenv(f'PG_MN_DEVICE{i}_RI', '').strip()
+    for i in range(1, 7)
+}
 IN_CSE_ORIGIN = os.getenv('PG_IN_CSE_ORIGIN', '')
 IN_CSE_RVI = os.getenv('PG_IN_CSE_RVI', '3')
 IN_CSE_TIMEOUT = float(os.getenv('PG_IN_CSE_TIMEOUT', '3'))
@@ -443,7 +447,10 @@ def _parse_onem2m_device(device_id: str, body: Any) -> dict[str, Any]:
 
 
 def _in_cse_configured() -> bool:
-    return bool(IN_CSE_URL and MN_CSE_ID and IN_CSE_ORIGIN and IN_CSE_RVI)
+    return bool(
+        IN_CSE_URL and MN_CSE_ID and IN_CSE_ORIGIN and IN_CSE_RVI
+        and all(MN_DEVICE_RIS.values())
+    )
 
 
 def _fetch_onem2m_device(device_id: str) -> dict[str, Any]:
@@ -451,9 +458,14 @@ def _fetch_onem2m_device(device_id: str) -> dict[str, Any]:
         return {
             'device_id': device_id,
             'ok': False,
-            'error': 'PG_IN_CSE_URL, PG_MN_CSE_ID, PG_IN_CSE_ORIGIN and PG_IN_CSE_RVI are required',
+            'error': 'IN-CSE connection settings and Device1-Device6 Resource IDs are required',
         }
-    path = '/'.join(quote(part, safe='') for part in (MN_CSE_ID.strip('/'), device_id))
+    resource_id = MN_DEVICE_RIS.get(device_id)
+    if not resource_id:
+        return {'device_id': device_id, 'ok': False, 'error': 'MN-CSE Resource ID is not configured'}
+    path = '/'.join(
+        quote(part, safe='') for part in (MN_CSE_ID.strip('/'), resource_id)
+    )
     url = f'{IN_CSE_URL}/~/{path}'
     headers = {
         'X-M2M-Origin': IN_CSE_ORIGIN,

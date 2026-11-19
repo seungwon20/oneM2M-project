@@ -98,14 +98,21 @@ Monitoring Node가 아직 시작되지 않았더라도 로컬 MEC 서비스는 �
 
 - `IN_CSE_SERVER_IP`: MEC Node가 접근할 수 있는 Computer B 주소(광고되는 POA)
 - `IN_CSE_SERVER_PORT`: IN-CSE listener 포트
-- `PG_IN_CSE_URL`: Dashboard Backend가 같은 장비의 IN-CSE를 조회하는 주소. 기본은 loopback
-  이며, IN-CSE와 Dashboard가 다른 장비에 놓일 때는 routable 주소로 변경합니다.
-- `PG_MN_CSE_ID`: 등록 대상 MEC MN-CSE의 CSE ID. 패키지 빌드 설정과 일치해야 합니다.
-- `PG_IN_CSE_ORIGIN`: IN-CSE 접근 정책에 허용된 Dashboard Originator
+- `PG_IN_CSE_URL`: 같은 Computer B의 IN-CSE를 조회하는 URL. 기본 loopback을 유지합니다.
+- `PG_MN_CSE_ID`: 패키지 metadata에서 채워지는 고정 MEC MN-CSE ID. 임의 변경하지 않습니다.
+- `PG_MN_DEVICE1_RI`~`PG_MN_DEVICE6_RI`: 고정 MEC Seed DB에서 생성되며 수정하지 않습니다.
+- `PG_IN_CSE_ORIGIN`: MEC Package의 `AE_ID`와 동일하게 설정합니다. MN-CSE Seed DB의
+  읽기 권한과 일치해야 합니다.
 - `PG_INGEST_KEY`: Dashboard ingest API 용도에 맞는 강한 임의 key. 실제 값을 문서/로그에
   출력하지 않습니다.
 - `PG_DASHBOARD_HOST`/`PG_DASHBOARD_PORT`: 브라우저에 제공할 Backend listener 주소/포트
 - `PG_DB_PATH`: Dashboard SQLite runtime 파일 경로
+
+Monitoring Package는 IN-CSE Base identity와 allowed MEC CSE ID를 빌드 때 설정합니다.
+사용자는 실제 Monitoring 주소, MEC Package의 `AE_ID`, ingest key를 설치 시 입력합니다.
+`PG_IN_CSE_ORIGIN`은 IN-CSE와 MN-CSE 양쪽의 읽기 권한 검사에 사용되므로 MEC Package의
+`AE_ID`와 동일해야 합니다. IN-CSE의 초기 AccessControl은 최초 DB 초기화 시 생성되므로
+최초 기동 전에 설정을 확정하세요.
 
 ### 설치/기동/확인
 

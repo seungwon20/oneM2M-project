@@ -17,6 +17,8 @@ Edit `config/.env` and set:
 
 - `AE_ID`: the Originator accepted by this CSE
 - `TINYIOT_SERVER_IP`: the MEC node's reachable LAN address advertised in the CSE POA
+- `REMOTE_CSE_ID`, `REMOTE_CSE_NAME`, `REMOTE_CSE_HOST`, `REMOTE_CSE_PORT`: the matching
+  IN-CSE identity and reachable Monitoring Node endpoint from the companion Monitoring Package
 
 The configure command fills the CSE Base and Device1-Device6 Resource IDs from the bundled
 seed database without printing them. The service-provider ID is included in build metadata

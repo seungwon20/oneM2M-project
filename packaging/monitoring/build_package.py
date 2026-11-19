@@ -19,6 +19,8 @@ PROJECT_ROOT = PACKAGE_SOURCE.parents[1]
 PACKAGE_NAME = "Monitoring-Package-Linux-x86_64"
 IN_BUILD_SCRIPT = PROJECT_ROOT / "IN-CSE" / "scripts" / "build.py"
 MN_BUILD_SCRIPT = PROJECT_ROOT / "MN-CSE" / "scripts" / "build.py"
+IN_CSE_BASE_NAME = "PinchGuardIN"
+IN_CSE_BASE_RI = "PinchGuardIN"
 
 
 def _load_module(path: Path, name: str):
@@ -60,30 +62,53 @@ def _write_archive(package_root: Path, archive_path: Path) -> None:
     )
 
 
+def _in_cse_build_settings(source_env: dict[str, str], mn_cse_id: str) -> dict[str, str]:
+    rvi = source_env.get("CSE_RVI", "").strip()
+    if rvi not in {"1", "2", "2a", "3", "4", "5"}:
+        raise ValueError("Project CSE_RVI must be set to a supported oneM2M release.")
+    sp_id = source_env.get("TINYIOT_CSE_BASE_SP_ID", "").strip()
+    if not sp_id or sp_id.upper().startswith(("YOUR_", "PLACEHOLDER", "REPLACE_", "TODO", "TBD")):
+        raise ValueError("Project TINYIOT_CSE_BASE_SP_ID must be set before building packages.")
+    return {
+        "IN_CSE_SERVER_IP": "127.0.0.1",
+        "IN_CSE_SERVER_PORT": "3001",
+        "IN_CSE_CSE_BASE_NAME": IN_CSE_BASE_NAME,
+        "IN_CSE_CSE_BASE_RI": IN_CSE_BASE_RI,
+        "IN_CSE_CSE_BASE_SP_ID": sp_id,
+        "IN_CSE_RVI": rvi,
+        "IN_CSE_ALLOWED_REMOTE_CSE_ID": f"/{mn_cse_id}",
+    }
+
+
+def _check_dashboard_build_dependencies() -> None:
+    required = ("fastapi", "uvicorn", "pydantic", "PIL")
+    missing = [module for module in required if importlib.util.find_spec(module) is None]
+    if missing:
+        raise RuntimeError(
+            "Dashboard build dependencies are missing: " + ", ".join(missing)
+            + ". Install packaging/monitoring/requirements-build.txt."
+        )
+
+
 def build_package(output_dir: Path) -> Path:
     if platform.system() != "Linux" or platform.machine().lower() not in {"x86_64", "amd64"}:
         raise RuntimeError("Monitoring package builds are currently supported only on Linux x86_64.")
     if importlib.util.find_spec("PyInstaller") is None:
         raise RuntimeError("PyInstaller is missing; install packaging/monitoring/requirements-build.txt.")
+    _check_dashboard_build_dependencies()
 
     mn_build = _load_module(MN_BUILD_SCRIPT, "mn_cse_build")
-    in_build = _load_module(IN_BUILD_SCRIPT, "in_cse_build")
     source_env = mn_build.parse_env(PROJECT_ROOT / ".env")
-    mn_build.validate_environment(source_env)
-    mn_build.validate_seed_db(source_env)
-    in_env = in_build.parse_env(PROJECT_ROOT / ".env")
+    if not source_env.get("CSE_RVI", "").strip():
+        raise ValueError("Project CSE_RVI must be set in the project-root .env.")
+    if not source_env.get("TINYIOT_CSE_BASE_SP_ID", "").strip():
+        raise ValueError("Project TINYIOT_CSE_BASE_SP_ID must be set in the project-root .env.")
+    mn_cse_id = mn_build.seed_base_ri("TinyIoT")
+    in_env = _in_cse_build_settings(source_env, mn_cse_id)
+    in_build = _load_module(IN_BUILD_SCRIPT, "in_cse_build")
     in_rvi = in_build.validate_environment(in_env)
-    if source_env.get("CSE_RVI") != in_rvi:
-        raise ValueError("IN_CSE_RVI must match the MEC CSE_RVI.")
-    if source_env.get("TINYIOT_CSE_BASE_SP_ID") != in_env.get("IN_CSE_CSE_BASE_SP_ID"):
-        raise ValueError("The IN-CSE and MN-CSE SP IDs must match.")
-    allowed = {
-        value.strip()
-        for value in in_env["IN_CSE_ALLOWED_REMOTE_CSE_ID"].split(",")
-        if value.strip()
-    }
-    if f'/{source_env["TINYIOT_CSE_BASE_RI"]}' not in allowed:
-        raise ValueError("IN_CSE_ALLOWED_REMOTE_CSE_ID must allow the MEC MN-CSE ID.")
+    if source_env["CSE_RVI"] != in_rvi:
+        raise ValueError("The package IN-CSE and MEC RVI values must match.")
 
     output_dir = output_dir.expanduser().resolve()
     archive_path = output_dir.with_suffix(".tar.gz")
@@ -91,10 +116,19 @@ def build_package(output_dir: Path) -> Path:
     if output_dir.exists() or archive_path.exists() or checksum_path.exists():
         raise FileExistsError(f"Package output already exists: {output_dir}. Choose a new --output-dir.")
 
-    subprocess.run([sys.executable, str(IN_BUILD_SCRIPT)], cwd=PROJECT_ROOT, check=True)
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="monitoring-package-build-") as temporary:
         work_root = Path(temporary)
+        build_env_path = work_root / "in-cse-build.env"
+        build_env_path.write_text(
+            "\n".join(f"{key}={value}" for key, value in in_env.items()) + "\n",
+            encoding="utf-8",
+        )
+        subprocess.run(
+            [sys.executable, str(IN_BUILD_SCRIPT), "--env-file", str(build_env_path)],
+            cwd=PROJECT_ROOT,
+            check=True,
+        )
         dist = work_root / "dist"
         work = work_root / "work"
         specs = work_root / "spec"
@@ -127,9 +161,18 @@ def build_package(output_dir: Path) -> Path:
             json.dumps(
                 {
                     "platform": "linux-x86_64",
-                    "in_cse_base_name": in_env["IN_CSE_CSE_BASE_NAME"],
+                    "in_cse_base_name": IN_CSE_BASE_NAME,
+                    "in_cse_id": IN_CSE_BASE_RI,
                     "in_cse_rvi": in_rvi,
-                    "mn_cse_id": source_env["TINYIOT_CSE_BASE_RI"],
+                    "mn_cse_id": mn_cse_id,
+                    "mn_device_resource_ids": {
+                        "Device1": source_env["FCNT_DEVICE1_RI"],
+                        "Device2": source_env["FCNT_DEVICE2_RI"],
+                        "Device3": source_env["FCNT_DEVICE3_RI"],
+                        "Device4": source_env["FCNT_DEVICE4_RI"],
+                        "Device5": source_env["FCNT_DEVICE5_RI"],
+                        "Device6": source_env["FCNT_RISK_RI"],
+                    },
                 },
                 indent=2,
             ) + "\n",
@@ -141,6 +184,7 @@ def build_package(output_dir: Path) -> Path:
         for source in (PACKAGE_SOURCE / "scripts").iterdir():
             destination = staged / "scripts" / source.name
             shutil.copy2(source, destination)
+            destination.write_bytes(destination.read_bytes().replace(b"\r\n", b"\n"))
             destination.chmod(destination.stat().st_mode | 0o111)
         shutil.copy2(PACKAGE_SOURCE / "README.md", staged / "README.md")
         shutil.move(str(staged), output_dir)

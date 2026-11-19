@@ -73,12 +73,19 @@ MEC MN-CSE의 runtime Remote CSE 등록 키:
 | `IN_CSE_CSE_BASE_RI` | IN-CSE CSE Base의 고정 RI |
 | `IN_CSE_CSE_BASE_SP_ID` | IN-CSE와 MN-CSE 간에 일치시킬 SP ID |
 | `IN_CSE_RVI` | IN-CSE oneM2M RVI. MEC `CSE_RVI`와 일치해야 함 |
-| `IN_CSE_ADMIN_AE_ID` | IN-CSE 빌드의 관리자 Originator 설정 |
+| `IN_CSE_ADMIN_AE_ID` | 선택적 개발 전용 privileged Originator. Monitoring Package 빌드에서는 설정하지 않음 |
 | `IN_CSE_ALLOWED_REMOTE_CSE_ID` | 허용할 CSE ID의 comma-separated 목록 |
 
 IN-CSE는 `IN-CSE/scripts/build.py`로 생성되는 config header를 사용합니다. 생성된
 `config.h`는 추적되지 않으며 직접 편집하지 않습니다. IN-CSE Dashboard 조회 경로는
 SP-relative addressing인 `/~/<MN-CSE-ID>/DeviceN`입니다.
+
+Monitoring Package는 IN-CSE Base identity와 고정 MEC Seed DB의 Remote CSE allow-list를
+빌드 과정에서 구성합니다. 패키지 사용자가 입력하는 `PG_IN_CSE_ORIGIN`은 기동 시
+`IN_CSE_DASHBOARD_ORIGINATOR`로 전달되며, IN-CSE의 최초 AccessControl 생성 시 retrieve와
+discovery 권한만 부여됩니다. 이 값은 **첫 기동 전에** 정하고, 이후 바꾸지 않는 것을
+권장합니다. Optional한 `IN_CSE_ADMIN_AE_ID`는 기존 관리자 AccessControl을 활성화하므로
+공유/운영 패키지 빌드에 사용하지 마세요.
 
 ## Dashboard 설정
 
@@ -89,7 +96,8 @@ Dashboard 로컬 개발은 `Dashboard/.env.example`, 배포는 Monitoring Packag
 |---|---|
 | `PG_IN_CSE_URL` | Dashboard Backend의 IN-CSE HTTP origin. path 없이 지정 |
 | `PG_MN_CSE_ID` | 등록된 원격 MN-CSE ID |
-| `PG_IN_CSE_ORIGIN` | IN-CSE access-control에서 허용된 Dashboard Originator |
+| `PG_MN_DEVICE1_RI`~`PG_MN_DEVICE6_RI` | Seed DB에서 생성되는 Device1~Device6 Resource ID |
+| `PG_IN_CSE_ORIGIN` | MEC Package의 `AE_ID`와 동일하게 설정. MN-CSE Seed DB가 허용한 Originator |
 | `PG_IN_CSE_RVI` | IN-CSE와 일치하는 RVI |
 | `PG_IN_CSE_TIMEOUT` | oneM2M 요청 timeout 초 |
 | `PG_MN_CSE_POLL_SECONDS` | Device1~Device6 polling 간격 |

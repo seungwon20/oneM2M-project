@@ -54,8 +54,9 @@ MN-CSE POA로 요청을 전달합니다.
 5. 필요하면 `CRITICAL` 처리에서 AI-AE가 Mock PLC에 STOP demo 요청을 보냅니다.
 6. MN-CSE는 설정된 Remote CSE endpoint에 등록을 시도합니다. IN-CSE가 사용 가능하지 않아도
    MEC 로컬 MN-CSE는 서비스를 시작하고 백그라운드에서 재시도합니다.
-7. Dashboard Backend는 `GET /~/<MN-CSE-ID>/Device1`부터 Device6까지를 IN-CSE에 요청합니다.
-   한 리소스 요청 실패가 나머지 요청을 숨기지 않습니다.
+7. Dashboard Backend는 Seed DB에서 생성된 Resource ID를 이용해
+   `GET /~/<MN-CSE-ID>/<Device-RI>`를 IN-CSE에 요청합니다. 한 리소스 요청 실패가 나머지
+   요청을 숨기지 않습니다.
 
 MN-CSE Remote CSE registration과 Dashboard routing은 소스상 구현되어 있으나, 이 문서 갱신
 시점의 두 컴퓨터 간 동작 결과를 성공으로 간주하지 않습니다.

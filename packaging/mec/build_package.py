@@ -210,6 +210,7 @@ def build_package(output_dir: Path) -> Path:
         for source in (PACKAGE_SOURCE / "scripts").iterdir():
             destination = staged_root / "scripts" / source.name
             shutil.copy2(source, destination)
+            destination.write_bytes(destination.read_bytes().replace(b"\r\n", b"\n"))
             destination.chmod(destination.stat().st_mode | 0o111)
 
         (staged_root / "licenses").mkdir()

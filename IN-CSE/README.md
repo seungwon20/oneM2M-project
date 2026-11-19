@@ -12,7 +12,8 @@ WSL Ubuntu/Linux에서 GCC, GNU Make, pkg-config, OpenSSL 및 libwebsockets 개�
 - listener POA 주소 및 port
 - IN-CSE Base name, RI, SP ID
 - MN-CSE와 일치하는 RVI 및 SP ID
-- IN-CSE administrator Originator
+- 선택적 개발 전용 administrator Originator (`IN_CSE_ADMIN_AE_ID`). Monitoring 패키지에는
+  privileged administrator를 빌드하지 않습니다.
 - `IN_CSE_ALLOWED_REMOTE_CSE_ID`에 포함되는 MEC MN-CSE ID
 
 환경변수 이름과 의미는 [설정 문서](../docs/CONFIGURATION.md)를 참고합니다. 실제 ID/address를
@@ -26,6 +27,11 @@ python3 IN-CSE/scripts/run.py
 `build.py`는 root `.env`를 검증해 `config.h`를 생성한 뒤 native server를 빌드합니다.
 `run.py`는 `.env` 설정을 프로세스 환경에 전달하고 runtime 디렉터리에서 server를 실행합니다.
 `config.h`, `server` 및 runtime 데이터는 빌드/실행 생성물입니다.
+
+Monitoring Package의 빌드 스크립트는 고정된 IN-CSE identity 및 MEC Seed DB의 Remote CSE
+ID로 임시 build config를 생성합니다. 다운로드 사용자는 `PG_IN_CSE_ORIGIN`을 설정하고
+IN-CSE의 최초 기동 전에 확정해야 합니다. 해당 Originator는 기본 AccessControl에서 조회
+권한을 받으며, `IN_CSE_ADMIN_AE_ID`의 privileged 권한을 재사용하지 않습니다.
 
 ## Network 및 요청 경로
 

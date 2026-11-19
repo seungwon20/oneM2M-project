@@ -109,31 +109,51 @@ void init_acp(cJSON *acp)
 	cJSON *pv = cJSON_CreateObject();
 	cJSON *pvs = cJSON_CreateObject();
 	cJSON *acr = cJSON_CreateArray();
-	cJSON *obj = cJSON_CreateObject();
-	cJSON *acor = cJSON_CreateArray();
+	cJSON *obj = NULL;
+	cJSON *acor = NULL;
 
 	cJSON_AddItemToObject(pv, "acr", acr);
-	cJSON_AddItemToObject(obj, "acor", acor);
 
-	cJSON_AddItemToArray(acor, cJSON_CreateString("all"));
-	cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(DEFAULT_ACOP));
-	cJSON_AddItemToArray(acr, obj);
+	const char *dashboard_originator = getenv("IN_CSE_DASHBOARD_ORIGINATOR");
+	if (!dashboard_originator || dashboard_originator[0] == '\0')
+	{
+		obj = cJSON_CreateObject();
+		acor = cJSON_CreateArray();
+		cJSON_AddItemToObject(obj, "acor", acor);
+		cJSON_AddItemToArray(acor, cJSON_CreateString("all"));
+		cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(DEFAULT_ACOP));
+		cJSON_AddItemToArray(acr, obj);
+	}
 
 	obj = cJSON_CreateObject();
 	cJSON_AddItemToObject(obj, "acor", string_to_cjson_string_list_item(ALLOWED_REMOTE_CSE_ID));
 	cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(ALL_ACOP));
 	cJSON_AddItemToArray(acr, obj);
 
-	obj = cJSON_CreateObject();
-	acr = cJSON_CreateArray();
-	acor = cJSON_CreateArray();
+	if (dashboard_originator && dashboard_originator[0] != '\0')
+	{
+		obj = cJSON_CreateObject();
+		acor = cJSON_CreateArray();
+		cJSON_AddItemToArray(acor, cJSON_CreateString(dashboard_originator));
+		cJSON_AddItemToObject(obj, "acor", acor);
+		cJSON_AddItemToObject(
+			obj, "acop",
+			cJSON_CreateNumber(ACOP_RETRIEVE + ACOP_DISCOVERY)
+		);
+		cJSON_AddItemToArray(acr, obj);
+	}
 
+	acr = cJSON_CreateArray();
 	cJSON_AddItemToObject(pvs, "acr", acr);
 
+#ifdef ADMIN_AE_ID
+	obj = cJSON_CreateObject();
+	acor = cJSON_CreateArray();
 	cJSON_AddItemToObject(obj, "acor", acor);
 	cJSON_AddItemToArray(acor, cJSON_CreateString(ADMIN_AE_ID));
 	cJSON_AddItemToObject(obj, "acop", cJSON_CreateNumber(ALL_ACOP));
 	cJSON_AddItemToArray(acr, obj);
+#endif
 
 	cJSON_AddItemToObject(acp, "pv", pv);
 	cJSON_AddItemToObject(acp, "pvs", pvs);
@@ -2019,7 +2039,8 @@ int forwarding_onem2m_resource(oneM2MPrimitive *o2pt, RTNode *target_rtnode)
 		   target_rtnode->uri ? target_rtnode->uri : "-",
 		   cJSON_GetObjectItem(target_rtnode->obj, "csi") ? cJSON_GetObjectItem(target_rtnode->obj, "csi")->valuestring : "-");
 
-	if (checkResourceAddressingType(o2pt->fr) == CSE_RELATIVE)
+	// A forwarded request keeps the original Originator for remote ACP checks.
+	if (!o2pt->isForwarding && checkResourceAddressingType(o2pt->fr) == CSE_RELATIVE)
 	{
 		sprintf(buf, "/%s/%s", CSE_BASE_RI, o2pt->fr);
 		free(o2pt->fr);

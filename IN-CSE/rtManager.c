@@ -190,34 +190,31 @@ RTNode *parse_spr_uri(oneM2MPrimitive *o2pt, char *target_uri)
  */
 RTNode *find_csr_rtnode_by_uri(char *uri)
 {
-    char *uriPtr;
-    // RTNode *rtnode = rt->cb->child, *parent_rtnode = NULL;
     if (!uri)
         return NULL;
     ResourceAddressingType RAT = checkResourceAddressingType(uri);
 
-    char *target_uri = NULL;
-    char *ptr = NULL;
+    const char *csi_segment = NULL;
     if (RAT == SP_RELATIVE) {
-        target_uri = strdup(uri);
-        ptr = strtok_r(target_uri + 1, "/", &uriPtr);
+        csi_segment = uri + 1;
     } else if (RAT == ABSOLUTE) {
-        // check if the uri is absolute and starts with the local CSE SP ID
-        if (isSPIDLocal(target_uri)) {
-            ptr = strchr(uri + 2, '/');
-            target_uri = strdup(ptr);
-            ptr = strtok_r(target_uri + 1, "/", &uriPtr);
-        } else {
-            target_uri = strdup(uri);
-            ptr = strchr(target_uri+2, '/');
-            ptr = strtok_r(ptr+1, "/", &uriPtr);
-        }
+        const char *sp_id_end = strchr(uri + 2, '/');
+        if (!sp_id_end)
+            return NULL;
+        csi_segment = sp_id_end + 1;
     } else {
-        free(target_uri);
         return NULL;
     }
-    if (!ptr)
+
+    size_t csi_length = strcspn(csi_segment, "/");
+    if (csi_length == 0)
         return NULL;
+    char *target_csi = malloc(csi_length + 2);
+    if (!target_csi)
+        return NULL;
+    target_csi[0] = '/';
+    memcpy(target_csi + 1, csi_segment, csi_length);
+    target_csi[csi_length + 1] = '\0';
 
     NodeList *csrlist = rt->csr_list;
 
@@ -225,21 +222,21 @@ RTNode *find_csr_rtnode_by_uri(char *uri)
     {
         // logger("UTIL", LOG_LEVEL_DEBUG, "csrlist->uri : %s", csrlist->uri);
         char *csi = cJSON_GetObjectItem(csrlist->rtnode->obj, "csi")->valuestring;
-        if (!strcmp(csi, target_uri))
+        if (!strcmp(csi, target_csi))
             break;
 
         cJSON *dcse_list = cJSON_GetObjectItem(csrlist->rtnode->obj, "dcse");
         cJSON *dcse = NULL;
         cJSON_ArrayForEach(dcse, dcse_list)
         {
-            if (!strcmp(cJSON_GetStringValue(dcse), target_uri))
+            if (!strcmp(cJSON_GetStringValue(dcse), target_csi))
                 break;
         }
         if (dcse) break;
         csrlist = csrlist->next;
     }
 
-    free(target_uri);
+    free(target_csi);
     logger("UTIL", LOG_LEVEL_DEBUG, "find_csr_rtnode_by_uri: %s", rt->registrar_csr ? rt->registrar_csr->uri : "NULL");
     return csrlist ? csrlist->rtnode : rt->registrar_csr;
 }
@@ -345,6 +342,7 @@ RTNode *get_remote_resource(char *address, char *originator, int *rsc)
     o2pt->op = OP_RETRIEVE;
     o2pt->rqi = strdup("retrieve remote resource");
     o2pt->rvi = CSE_RVI;
+    o2pt->isForwarding = true;
 
     forwarding_onem2m_resource(o2pt, csr);
     *rsc = o2pt->rsc;

@@ -24,9 +24,9 @@ REQUIRED_ENV = (
     "IN_CSE_CSE_BASE_RI",
     "IN_CSE_CSE_BASE_SP_ID",
     "IN_CSE_RVI",
-    "IN_CSE_ADMIN_AE_ID",
     "IN_CSE_ALLOWED_REMOTE_CSE_ID",
 )
+OPTIONAL_ENV = ("IN_CSE_ADMIN_AE_ID",)
 
 
 def parse_env(path: Path) -> dict[str, str]:
@@ -56,8 +56,9 @@ def validate_environment(env: dict[str, str]) -> str:
     if missing:
         raise ValueError("Missing required .env setting(s): " + ", ".join(missing))
     placeholders = [
-        key for key in REQUIRED_ENV
-        if env[key].strip().upper().startswith(
+        key for key in (*REQUIRED_ENV, *OPTIONAL_ENV)
+        if env.get(key, "").strip()
+        and env[key].strip().upper().startswith(
             ("YOUR_", "PLACEHOLDER", "REPLACE_", "CHANGE_", "CHANGEME", "TODO", "TBD")
         )
     ]
@@ -72,9 +73,11 @@ def validate_environment(env: dict[str, str]) -> str:
     if env["IN_CSE_RVI"] not in {"1", "2", "2a", "3", "4", "5"}:
         raise ValueError("IN_CSE_RVI must be one of 1, 2, 2a, 3, 4, or 5.")
     for key in ("IN_CSE_SERVER_IP", "IN_CSE_CSE_BASE_NAME", "IN_CSE_CSE_BASE_RI",
-                "IN_CSE_CSE_BASE_SP_ID", "IN_CSE_ADMIN_AE_ID"):
+                "IN_CSE_CSE_BASE_SP_ID"):
         if any(character in env[key] for character in ('"', "\n", "\r")):
             raise ValueError(f"{key} contains an unsupported character.")
+    if any(character in env.get("IN_CSE_ADMIN_AE_ID", "") for character in ('"', "\n", "\r")):
+        raise ValueError("IN_CSE_ADMIN_AE_ID contains an unsupported character.")
     if any(character in env["IN_CSE_SERVER_IP"] for character in ("/", ":", " ", "\t")):
         raise ValueError("IN_CSE_SERVER_IP must be a host name or IPv4 address without a scheme or port.")
     for key in ("IN_CSE_CSE_BASE_NAME", "IN_CSE_CSE_BASE_RI"):
@@ -100,7 +103,6 @@ def generate_config(env: dict[str, str], rvi: str) -> None:
         "DB_SQLITE": "1",
         "DB_POSTGRESQL": "1",
         "DB_TYPE": "DB_SQLITE",
-        "ADMIN_AE_ID": json.dumps(env["IN_CSE_ADMIN_AE_ID"]),
         "DEFAULT_ACOP": "ACOP_CREATE",
         "ALLOWED_REMOTE_CSE_ID": json.dumps(env["IN_CSE_ALLOWED_REMOTE_CSE_ID"]),
         "MONO_THREAD": "0",
@@ -121,6 +123,8 @@ def generate_config(env: dict[str, str], rvi: str) -> None:
         "LOG_BUFFER_SIZE": "MAX_PAYLOAD_SIZE",
         "DEFAULT_DISCOVERY_SORT": "SORT_DESC",
     }
+    if env.get("IN_CSE_ADMIN_AE_ID", "").strip():
+        definitions["ADMIN_AE_ID"] = json.dumps(env["IN_CSE_ADMIN_AE_ID"])
     template = IN_CSE_DIR / "config.h.in"
     text = template.read_text(encoding="utf-8")
     for macro, value in definitions.items():

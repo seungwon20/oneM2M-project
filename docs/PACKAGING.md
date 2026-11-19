@@ -48,8 +48,9 @@ Python runtime을 사용하나 TinyIoT 네이티브 실행 파일의 시스템 �
 
 ## Monitoring Package
 
-빌드 진입점은 `packaging/monitoring/build_package.py`입니다. Linux x86_64에서 MEC/IN-CSE root
-`.env` 간의 RVI, SP ID, Remote CSE allow-list와 Seed DB를 검증합니다. IN-CSE를 빌드하고
+빌드 진입점은 `packaging/monitoring/build_package.py`입니다. Linux x86_64에서 root `.env`의
+MEC RVI 및 SP ID와 MEC Seed DB의 CSE Base RI를 읽습니다. 패키지 빌더가 고정 IN-CSE
+identity와 해당 Seed DB만 허용하는 Remote CSE build 설정을 생성합니다. IN-CSE를 빌드하고
 IN-CSE, Dashboard Backend, 패키지 제어기를 패키징합니다. 기본 출력은
 `packaging/monitoring/dist/Monitoring-Package-Linux-x86_64/`이며 `.tar.gz` 및 `.sha256`도
 생성합니다.
@@ -93,8 +94,10 @@ python -m pip install -r packaging/monitoring/requirements-build.txt
 python packaging/monitoring/build_package.py
 ```
 
-두 빌드 모두 프로젝트 root `.env`와 Seed DB를 사용합니다. 이 설정 파일은 패키지에 복사되지
-않습니다. 출력 디렉터리/아카이브가 이미 존재하면 덮어쓰지 않고 실패하므로 새 `--output-dir`을
+MEC 빌드는 프로젝트 root `.env`와 Seed DB 설정을 검증합니다. Monitoring 빌드는 root `.env`의
+`CSE_RVI`, `TINYIOT_CSE_BASE_SP_ID`와 MEC Seed DB의 Base RI를 사용하며 Monitoring Node의
+실제 주소/Originator/ingest key는 요구하지 않습니다. Root `.env`는 패키지에 복사되지 않습니다.
+출력 디렉터리/아카이브가 이미 존재하면 덮어쓰지 않고 실패하므로 새 `--output-dir`을
 지정합니다. 컴파일 시 생성되는 CSE 설정 header는 패키지용 build configuration 산출물입니다.
 빌드 로그나 metadata에 실제 Originator, Resource ID 또는 인증정보를 추가하지 않습니다.
 
@@ -105,7 +108,8 @@ python packaging/monitoring/build_package.py
 - MEC는 `./scripts/configure-mec`로 자체 `config/.env`를 만들고 MEC 장비의 POA 주소,
   Remote IN-CSE endpoint와 Originator를 설정합니다.
 - Monitoring은 `./scripts/configure-monitoring`로 별도 설정을 만들고 Monitoring Node의 POA,
-  Dashboard listener, local IN-CSE URL 및 허용된 Originator를 설정합니다.
+  Dashboard listener, MEC Package의 `AE_ID`와 ingest key를 설정합니다. `PG_IN_CSE_ORIGIN`은
+  MN-CSE Seed DB의 읽기 권한과 일치해야 하며, IN-CSE 최초 기동 전에 정해야 합니다.
 - 두 패키지는 서로 다른 컴퓨터에 배치될 수 있으므로 `.env`를 공유하지 않습니다.
 - 설정 파일에는 운영상 민감한 값이 들어갈 수 있으므로 접근을 제한하고 Git에 커밋하지 않습니다.
 

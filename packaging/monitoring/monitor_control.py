@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 from urllib.error import URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
@@ -26,16 +27,23 @@ def package_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _build_info(root: Path) -> dict[str, str]:
+def _build_info(root: Path) -> dict[str, Any]:
     path = root / "config" / "build-info.json"
     try:
         info = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError("Monitoring package build metadata is missing or invalid.") from exc
-    required = ("in_cse_base_name", "in_cse_rvi", "mn_cse_id")
+    required = ("in_cse_base_name", "in_cse_id", "in_cse_rvi", "mn_cse_id")
     missing = [key for key in required if not isinstance(info.get(key), str) or not info[key]]
     if missing:
         raise ValueError("Monitoring package metadata is missing: " + ", ".join(missing))
+    devices = info.get("mn_device_resource_ids")
+    expected_devices = tuple(f"Device{i}" for i in range(1, 7))
+    if not isinstance(devices, dict) or any(
+        not isinstance(devices.get(device), str) or not devices[device]
+        for device in expected_devices
+    ):
+        raise ValueError("Monitoring package metadata is missing Device1-Device6 Resource IDs.")
     return info
 
 
@@ -52,6 +60,10 @@ def configure(root: Path) -> None:
         "PG_MN_CSE_ID": info["mn_cse_id"],
         "PG_IN_CSE_RVI": info["in_cse_rvi"],
     }
+    generated.update({
+        f"PG_MN_DEVICE{i}_RI": info["mn_device_resource_ids"][f"Device{i}"]
+        for i in range(1, 7)
+    })
     lines = []
     for line in template.read_text(encoding="utf-8").splitlines():
         key, separator, _ = line.partition("=")
@@ -59,7 +71,7 @@ def configure(root: Path) -> None:
         lines.append(f"{key}={generated[key]}" if separator and key in generated else line)
     env_path.parent.mkdir(parents=True, exist_ok=True)
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print("Created config/.env. Set the Monitoring Node address and Dashboard originator/key.")
+    print("Created config/.env. Set the Monitoring Node address, PG_IN_CSE_ORIGIN to the MEC AE_ID, and PG_INGEST_KEY.")
 
 
 def _read_env(path: Path) -> dict[str, str]:
@@ -99,6 +111,7 @@ def _settings(root: Path) -> tuple[dict[str, str], dict[str, str]]:
         "IN_CSE_SERVER_IP", "IN_CSE_SERVER_PORT", "PG_DASHBOARD_HOST",
         "PG_DASHBOARD_PORT", "PG_DB_PATH", "PG_INGEST_KEY", "PG_IN_CSE_URL",
         "PG_MN_CSE_ID", "PG_IN_CSE_ORIGIN", "PG_IN_CSE_RVI",
+        *(f"PG_MN_DEVICE{i}_RI" for i in range(1, 7)),
     )
     missing = [key for key in required if not settings.get(key, "").strip()]
     placeholders = [
@@ -119,6 +132,10 @@ def _settings(root: Path) -> tuple[dict[str, str], dict[str, str]]:
         raise ValueError("PG_MN_CSE_ID does not match the TinyIoT identifier used for this package.")
     if settings["PG_IN_CSE_RVI"] != info["in_cse_rvi"]:
         raise ValueError("PG_IN_CSE_RVI does not match the IN-CSE binary.")
+    for index in range(1, 7):
+        device = f"Device{index}"
+        if settings[f"PG_MN_DEVICE{index}_RI"] != info["mn_device_resource_ids"][device]:
+            raise ValueError(f"PG_MN_DEVICE{index}_RI does not match the bundled MEC Seed DB.")
     endpoint = urlsplit(settings["PG_IN_CSE_URL"])
     if endpoint.scheme != "http" or not endpoint.hostname or endpoint.path:
         raise ValueError("PG_IN_CSE_URL must be an HTTP origin without a path.")
@@ -241,6 +258,9 @@ def start(root: Path) -> None:
     child_env = os.environ.copy()
     child_env.update(settings)
     child_env["PG_DB_PATH"] = str((root / settings["PG_DB_PATH"]).resolve())
+    child_env["IN_CSE_SERVER_IP"] = settings["IN_CSE_SERVER_IP"]
+    child_env["IN_CSE_SERVER_PORT"] = settings["IN_CSE_SERVER_PORT"]
+    child_env["IN_CSE_DASHBOARD_ORIGINATOR"] = settings["PG_IN_CSE_ORIGIN"]
     in_cse, in_pid, in_log = _paths(root, "in-cse")
     dashboard, dashboard_pid, dashboard_log = _paths(root, "dashboard")
     try:

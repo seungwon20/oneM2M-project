@@ -113,6 +113,11 @@ def test_mn_cse_devices_endpoint(monkeypatch):
     import app as app_module
     monkeypatch.setattr(app_module, 'IN_CSE_URL', 'http://in-cse.test:3001')
     monkeypatch.setattr(app_module, 'MN_CSE_ID', 'tinyiot')
+    monkeypatch.setattr(
+        app_module,
+        'MN_DEVICE_RIS',
+        {f'Device{i}': f'device-{i}-ri' for i in range(1, 7)},
+    )
     monkeypatch.setattr(app_module, 'IN_CSE_ORIGIN', 'dashboard-test')
     monkeypatch.setattr(app_module, 'IN_CSE_RVI', '3')
     def fake_fetch(device_id):
@@ -142,6 +147,11 @@ def test_mn_cse_device_uses_in_cse_sp_relative_route(monkeypatch):
 
     monkeypatch.setattr(app_module, 'IN_CSE_URL', 'http://in-cse.test:3001')
     monkeypatch.setattr(app_module, 'MN_CSE_ID', '/tinyiot/')
+    monkeypatch.setattr(
+        app_module,
+        'MN_DEVICE_RIS',
+        {f'Device{i}': f'device-{i}-ri' for i in range(1, 7)},
+    )
     monkeypatch.setattr(app_module, 'IN_CSE_ORIGIN', 'dashboard-test')
     monkeypatch.setattr(app_module, 'IN_CSE_RVI', '3')
     captured = {}
@@ -168,7 +178,7 @@ def test_mn_cse_device_uses_in_cse_sp_relative_route(monkeypatch):
     result = app_module._fetch_onem2m_device('Device1')
 
     assert result['ok'] is True
-    assert captured['url'] == 'http://in-cse.test:3001/~/tinyiot/Device1'
+    assert captured['url'] == 'http://in-cse.test:3001/~/tinyiot/device-1-ri'
     assert captured['headers']['X-m2m-origin'] == 'dashboard-test'
 
 
