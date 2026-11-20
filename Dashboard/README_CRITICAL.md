@@ -1,17 +1,17 @@
-# PinchGuard 자동 위험 시나리오 — CRITICAL 포함
+# PinchGuard Automated Risk Scenario — Including CRITICAL
 
-## 변경점
+## Changes
 
-- 기존 3단계(SAFE / WARNING / HIGH) → **4단계(SAFE / WARNING / HIGH / CRITICAL)**
-- UNKNOWN은 센서·판정값 유효성 부족에 사용하는 독립 상태로 유지
-- 자동 시나리오: **SAFE → WARNING → HIGH → CRITICAL → HIGH → WARNING → SAFE**
-- 자동 송신기, FastAPI `/api/risk`, `/api/demo`, `/notify`, 웹 UI, SQLite 통계 모두 수정
-- HIGH와 CRITICAL을 이벤트 기록에서 별도 집계 (`stats.high_events`, `stats.critical_events`)
-- 데모 버튼에 **매우 위험** 추가, 최고 위험 색상을 자홍/진홍 계열로 구분
+- Expanded the original three-level risk classification (**SAFE / WARNING / HIGH**) to **four levels (SAFE / WARNING / HIGH / CRITICAL)**.
+- Retained **UNKNOWN** as a separate state for missing, insufficient, or invalid sensor and assessment data.
+- Updated the automated demonstration sequence to **SAFE → WARNING → HIGH → CRITICAL → HIGH → WARNING → SAFE**.
+- Updated the automated sender, FastAPI endpoints (`/api/risk`, `/api/demo`, and `/notify`), web UI, and SQLite statistics.
+- Added separate event counts for HIGH and CRITICAL (`stats.high_events` and `stats.critical_events`).
+- Added a **CRITICAL** demonstration button and distinguished the highest risk level with magenta and deep-red visual indicators.
 
-## 실행 (WSL Ubuntu)
+## Running the Demo (WSL Ubuntu)
 
-첫 번째 터미널:
+### Terminal 1 — Start the Dashboard
 
 ```bash
 cd /mnt/c/Users/minea/desktop/PinchGuard_Dashboard_CRITICAL
@@ -22,7 +22,7 @@ export PG_INGEST_KEY='local-dev-change-me'
 uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-두 번째 터미널:
+### Terminal 2 — Start the Synthetic Data Sender
 
 ```bash
 cd /mnt/c/Users/minea/desktop/PinchGuard_Dashboard_CRITICAL
@@ -31,18 +31,24 @@ export PG_API_KEY='local-dev-change-me'
 python camera_sender.py --source synthetic --url http://localhost:8000/api/frame --fps 10 --cycle-seconds 24
 ```
 
-Windows에서 `http://localhost:8000` 접속. 기존에 8000 포트에서 실행 중인 서버가 있다면 종료 후 새 버전으로 실행하세요.
+Open **http://localhost:8000** in a Windows browser. If another server is already using port `8000`, stop it before starting this version.
 
-더 빠른 촬영은 `--cycle-seconds 12`로 단축할 수 있습니다.
+For a faster demonstration cycle, change `--cycle-seconds 24` to `--cycle-seconds 12`.
 
-## 시연용 위험 등급 기준 (실제 산업 안전 기준 아님)
+## Demonstration Risk Classification Criteria
 
-| 등급 | 예제 조건 |
+> **These are illustrative, rule-based criteria for a simulated demonstration, not validated industrial safety thresholds.**
+
+| Risk level | Example condition |
 |---|---|
-| CRITICAL | 설비 가동 + 작업자 존재 + 광전식 차단 + 거리 ≤ 20cm |
-| HIGH | 설비 가동 + 작업자 존재 + (광전식 차단 또는 거리 ≤ 45cm), CRITICAL 제외 |
-| WARNING | 설비 가동 + 작업자 존재 + 거리 ≤ 105cm, 상위 등급 제외 |
-| SAFE | 위 조건을 만족하지 않는 정상 데모 상태 |
-| UNKNOWN | 필수 센서 입력 없음 또는 결과 유효 기간 초과 |
+| **CRITICAL** | Machinery operating + worker present + photoelectric beam interrupted + distance ≤ 20 cm |
+| **HIGH** | Machinery operating + worker present + (photoelectric beam interrupted **or** distance ≤ 45 cm), excluding CRITICAL conditions |
+| **WARNING** | Machinery operating + worker present + distance ≤ 105 cm, excluding higher risk levels |
+| **SAFE** | Normal demonstration state that does not meet any of the above risk conditions |
+| **UNKNOWN** | Required sensor data is missing, or the assessment result is no longer valid |
 
-영상과 센서·위험 값은 **규칙 기반의 가상 시뮬레이션**입니다. CRITICAL은 실제 끼임 사고의 감지나 설비 정지 기능을 의미하지 않습니다.
+## Limitations
+
+The video, sensor measurements, and risk values are generated through a **rule-based synthetic simulation**. A CRITICAL classification does **not** demonstrate detection of a real machinery entrapment incident or the ability to stop physical industrial equipment.
+
+**Repository note:** The commands above preserve the original local WSL directory path. When running from the `integration/in-cse-dashboard` branch, use the repository's `Dashboard/` directory instead and configure the required environment variables for that setup.
