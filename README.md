@@ -51,13 +51,6 @@ flowchart LR
 
 **Interpret the arrows carefully:** remote registration and IN-CSE forwarding are **implemented in source**. The release notes report both packages tested together within **one WSL environment over loopback**. A deployment to two physically separate computers, including LAN routing and firewall behavior, has **not** been validated by those results.
 
-### Demonstration screenshots
-
-The screenshots below are taken from the team's recorded demonstration. They illustrate **manual oneM2M resource operations and a dashboard demonstration**; do not interpret them as a new end-to-end test of the downloadable archives.
-
-| Device6 UPDATE · Postman | Device1–6 + proximity trend | Risk history and acknowledgement |
-|:--:|:--:|:--:|
-| ![Device6 oneM2M PUT with HTTP 200](assets/postman-device6-put.jpg) | ![Dashboard showing device resources and trend](assets/dashboard-six-devices.jpg) | ![Dashboard risk events](assets/dashboard-risk-events.jpg) |
 
 ## Contents
 
