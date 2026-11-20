@@ -143,69 +143,75 @@ use the configured Layer 2 connection and write to the real CSE; press `Ctrl+C` 
 - The CSE check reports Resource ID matches and schema results without printing values loaded
   from `.env`.
 
-# Option C 기반 아키텍처 적용 및 구성 요소 선택 사유
+# Rationale for Adopting an Option C–Based Architecture and Selecting System Components
 
-## 1. 아키텍처 선정 배경
+## 1. Background of Architecture Selection
 
-본 시스템은 ETSI GR MEC-DEC 050에서 제시하는 Deployment Option C를 기본 아키텍처로 선정하였다.
+This system adopts **Deployment Option C**, as presented in ETSI GR MEC-DEC 050, as its reference architecture.
 
-Option C는 MEC Platform과 oneM2M MN-CSE를 동일한 물리적 Edge Node에 배치하는 구조로, 두 플랫폼 간 불필요한 데이터 이동과 정보 교환을 줄이고 Edge 환경에서 데이터를 처리할 수 있다는 특징이 있다.
+Option C describes an architecture in which the MEC Platform and the oneM2M MN-CSE are deployed on the same physical Edge Node. This arrangement reduces unnecessary data transfers and information exchanges between the two platforms and enables data processing within the edge environment.
 
-본 시스템 역시 MEC 환경 내에서 AI Application과 oneM2M CSE를 운영하며, AI Application이 외부 기기로부터 데이터를 수신하고 분석한 후 필요한 데이터를 CSE에 전달하는 구조이므로 Option C의 배치 방식과 부합한다.
+Similarly, the proposed system operates an AI Application and a oneM2M CSE within a MEC environment. The AI Application receives data from external devices, performs analysis, and forwards the necessary information to the CSE. Therefore, the system's deployment structure is consistent with the co-location approach presented in Option C.
 
-다만 Option C에 제시된 모든 구성 요소와 기능을 그대로 적용하지는 않았다. 본 시스템의 실제 기능과 구현 범위를 고려하여 필요한 구성 요소만 반영하였다.
+However, not all components and functionalities described in Option C have been adopted. Instead, the architecture has been selectively adapted to reflect the actual requirements and implementation scope of the proposed system.
 
-## 2. 구성 요소 및 기능의 제외 사유
+## 2. Rationale for Excluding Specific Components and Functionalities
 
-### 2.1 다수의 AE(Application Entity) 구성 제외
+### 2.1. Exclusion of Multiple Application Entities (AEs)
 
-Option C에서는 Swarm Computing, Federated Learning, 3rd Party IPE 등 여러 MN-AE를 개별 애플리케이션으로 구성하고 있다.
+Option C illustrates several MN-AEs operating as independent applications, including Swarm Computing, Federated Learning, and third-party Interworking Proxy Entities (IPEs).
 
-그러나 본 시스템에서는 여러 애플리케이션이 각각 독립적으로 서비스를 수행하는 구조가 아니라, 하나의 AI Application이 여러 기기로부터 데이터를 수신하고 AI 분석 및 판단을 수행한다.
+However, the proposed system does not require multiple independent applications to perform separate services. Instead, a single AI Application receives data from multiple devices and performs AI-based analysis and decision-making.
 
-따라서 다수의 AE를 별도로 구성하지 않고, 단일 AI Application을 MN-AE로 구성하였다.
+Accordingly, rather than deploying multiple AEs separately, the system employs a single AI Application as its MN-AE.
 
-### 2.2 Swarm Computing 및 Federated Learning 기능 제외
+### 2.2. Exclusion of Swarm Computing and Federated Learning
 
-Option C에 포함된 Swarm Computing과 Federated Learning은 여러 Edge 환경 또는 애플리케이션 간의 협력적 연산 및 분산 학습을 지원하기 위한 구성 요소이다.
+Swarm Computing and Federated Learning, as illustrated in Option C, are intended to support collaborative computation and distributed model training across multiple edge environments or applications.
 
-본 시스템의 목적은 단일 MEC 환경에서 수집한 기기 데이터를 AI Application이 분석하고, 그 결과를 oneM2M CSE에 저장하는 것이다.
+The primary objective of the proposed system is to collect device data within a single MEC environment, analyze the collected information using an AI Application, and store the resulting data in a oneM2M CSE.
 
-따라서 다중 Edge 간 협력 연산이나 분산 모델 학습을 수행하지 않으므로 해당 기능들은 구현 범위에서 제외하였다.
+Since the system does not perform collaborative computation across multiple edge nodes or distributed model training, these functionalities have been excluded from the current implementation scope.
 
-### 2.3 별도의 3rd Party IPE 구성 제외
+### 2.3. Exclusion of a Separate Third-Party Interworking Proxy Entity (IPE)
 
-Option C에는 Non-oneM2M Device와 oneM2M 플랫폼 사이의 연동을 담당하는 3rd Party IPE가 별도의 MN-AE로 표현되어 있다.
+Option C represents the third-party IPE as a separate MN-AE responsible for interoperability between Non-oneM2M Devices and the oneM2M platform.
 
-본 시스템에서는 하나의 AI Application이 외부 기기로부터 데이터를 직접 수신하고, 해당 데이터를 분석하여 필요한 원본 데이터와 분석 결과를 oneM2M CSE에 전달한다.
+In the proposed system, however, a single AI Application directly receives data from external devices, processes the received information, and forwards both the necessary original data and analysis results to the oneM2M CSE.
 
-이에 따라 기기 데이터 수신 및 처리 기능을 AI Application에서 담당하도록 구성하였으며, 별도의 3rd Party IPE 애플리케이션은 분리하여 구성하지 않았다.
+Therefore, device data acquisition and processing are handled within the AI Application, eliminating the need to deploy a separate third-party IPE application.
 
-단, AI Application 내부에서 기기별 프로토콜을 oneM2M 리소스 구조로 변환하거나 기기 기능과 리소스 간 동기화를 수행하는 경우에는 해당 내부 기능을 IPE의 역할로 구분할 수 있다.
+Nevertheless, if the AI Application internally performs functions such as translating device-specific protocols into oneM2M resource structures or synchronizing device functionalities with corresponding oneM2M resources, those internal functions may be identified as fulfilling the role of an IPE.
 
-### 2.4 oneM2M Device 및 MEC Device 구성 제외
+### 2.4. Exclusion of oneM2M Devices and MEC Devices
 
-본 시스템에서 데이터를 제공하는 외부 기기들은 oneM2M 표준을 직접 지원하지 않는 Non-oneM2M Device로 구성된다.
+The external devices that provide data to the proposed system are classified as **Non-oneM2M Devices**, as they do not directly support the oneM2M standard.
 
-따라서 oneM2M Device 및 MEC Device를 별도 구성 요소로 포함하지 않았다. 각 기기의 데이터는 기기별 통신 방식에 따라 AI Application으로 전달되며, AI Application이 필요한 데이터를 선별하여 CSE에 저장한다.
+Consequently, oneM2M Devices and MEC Devices have not been included as separate architectural components.
 
-### 2.5 Cloud IN-CSE 및 IN-AE 구성 제외
+Data from each external device is transmitted to the AI Application through its respective communication mechanism. The AI Application then selects the necessary information and stores it in the CSE.
 
-본 구현 범위에서는 Cloud에 별도의 IN-CSE를 구축하여 Edge MN-CSE와 연동하는 중앙 집중형 서비스 관리 및 데이터 동기화 기능을 구현하지 않는다.
+### 2.5. Exclusion of Cloud IN-CSE and IN-AE Components
 
-따라서 Cloud IN-CSE와 IN-AE 및 이들 사이의 Mcc 연동은 현재 구현 아키텍처에서 제외한다.
+The current implementation does not establish a separate cloud-based IN-CSE to provide centralized service management and data synchronization through integration with the edge MN-CSE.
 
-※ 추후 Cloud 기반 oneM2M 플랫폼과 연동하거나 다수의 Edge CSE 간 데이터 동기화 및 관리가 필요한 경우 해당 구성을 확장할 수 있다.
+Accordingly, the Cloud IN-CSE, IN-AE, and the associated Mcc interworking between these components have been excluded from the current implementation architecture.
 
-## 3. 최종 아키텍처 구성
+If integration with a cloud-based oneM2M platform or centralized data synchronization and management across multiple edge CSEs become necessary, these components may be incorporated in future extensions.
 
-본 시스템은 Option C의 기본적인 배치 구조를 유지하면서 실제 구현에 필요한 구성 요소만 적용하였다.
+## 3. Final Architecture Configuration
 
-- **Non-oneM2M Device:** 외부 데이터를 제공하는 다수의 기기
-- **AI Application (MN-AE):** 기기 데이터 수신, AI 분석 및 판단, 저장 대상 데이터 선별
-- **oneM2M MN-CSE:** Container 및 ContentInstance를 통한 기기별 원본 데이터와 AI 분석 결과 관리
-- **MEC Platform:** MEC 환경 및 관련 서비스 기능 제공
+The proposed system preserves the fundamental deployment structure of Option C while incorporating only the components necessary for its actual implementation.
 
-AI Application과 MN-CSE는 동일한 MEC 환경에 배치하되, 별도의 실행 구성 요소로 운영한다. AI Application은 Mca를 통해 MN-CSE에 접근하며, 기기별 데이터를 Container에 구분하여 저장하고 실제 데이터는 ContentInstance로 관리한다.
+The final architecture consists of the following components:
 
-결과적으로 본 시스템은 Option C를 기반으로 하되, 다중 AE, 분산 연산 및 학습 기능, 별도의 IPE 애플리케이션 등 현재 구현 목적에 필요하지 않은 요소를 제외한 단순화된 MEC-oneM2M 연동 구조로 설계하였다.
+- **Non-oneM2M Devices:** Multiple external devices responsible for providing input data.
+- **AI Application (MN-AE):** Responsible for receiving device data, performing AI-based analysis and decision-making, and selecting the information to be stored.
+- **oneM2M MN-CSE:** Responsible for managing device-specific original data and AI analysis results through Container and ContentInstance resources.
+- **MEC Platform:** Provides the MEC execution environment and associated service functionalities.
+
+The AI Application and MN-CSE are deployed within the same MEC environment while operating as separate execution components.
+
+The AI Application accesses the MN-CSE through the **Mca reference point**, organizes device-specific information into separate Container resources, and manages individual data records as ContentInstance resources.
+
+As a result, the proposed system adopts a simplified MEC–oneM2M integration architecture based on Deployment Option C. It retains the core co-location principle while excluding components that are unnecessary for the current implementation objectives, including multiple independent AEs, distributed computing and learning functionalities, and a separate IPE application.
