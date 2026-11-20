@@ -1,217 +1,117 @@
-# MEC Safety Application
+# AI-AE — Edge Sensor Processing and Risk Inference
 
-This project contains Layer 1 and Layer 2 as in-process modules in one application. Layer 1
-validates and stores each sensor update, then directly awaits Layer 2's internal method call.
-Layer 2 maps the update to an existing FlexContainer and sends a oneM2M HTTP PUT. No separate
-Layer 2 server, process, queue, or oneM2M AE registration is involved.
+**Component:** Computer A / MEC-oriented node  
+**Project guide:** [PinchGuard](../README.md)
 
-## Included behavior
+The AI Application Entity (AI-AE) is a **single FastAPI process** with Layer 1 input processing, an in-process Sensor Trigger Engine and Layer 2 oneM2M request handling. It does not start a separate Layer 2 server or automatically register an `m2m:ae` resource.
 
-- Receives sensor JSON payloads over HTTP
-- Identifies the device by URL path (`device1` through `device5`)
-- Validates the payload against the specification for each device
-- Maintains only the latest valid value per device in memory
-- Produces a partial or complete device snapshot
-- Calls the Sensor Trigger Engine hook after validation/state update and before Layer 2
-  sensor forwarding; the default engine predicts risk when device3 reports a blocked beam
-  while device4 reports a rotating belt
-- Uses the packaged classifier to infer a risk level from device1, device4, and device5 data;
-  no risk label is required in sensor requests
-- Sends each successful model prediction to the configured Device6 Risk FlexContainer;
-  `triggered` remains true only for `HIGH` and `CRITICAL`
-- Hands validated sensor updates directly to Layer 2, which maps each device to its configured FCNT
-- Adds the MEC receive time as `received_at` to sensor FCNT updates and `evaluated_at` to risk
-  updates, without changing the measurement fields or adding either timestamp to sensor input
-- Exposes a separate risk-assessment handoff for caller-provided risk labels
-- Uses oneM2M HTTP Binding PUT and checks HTTP status, `X-M2M-RSC`, and response `X-M2M-RI`
-- Uses the CSE-confirmed resource wrappers `eg:Device1` through `eg:Device6`
+## Processing contract
 
-## Run locally
+1. Accept `POST /api/devices/{device_id}/data` for `device1` through `device5`.
+2. Reject missing, extra or incorrectly typed sensor attributes ([`device_schemas.py`](mec_safety/device_schemas.py)).
+3. Store the latest accepted measurement in process memory ([`storage.py`](mec_safety/storage.py)); an HTTP response is not a historical time-series store.
+4. Call the Sensor Trigger Engine with the current/previous state and the updated snapshot.
+5. On a **Device3 `beam_blocked=true`** update, if the latest **Device4 `is_rotating=true`**, run the packaged classifier using Device1 counts, Device4 speed and Device5 distance.
+6. Optionally send a direct TCP STOP to the **Mock PLC** for a model-predicted `CRITICAL` actionable risk.
+7. Forward validated sensor values to their fixed MN-CSE FlexContainers; if inference produced a risk result, forward title-cased risk values to Device6.
 
-Run the services and tests inside the same WSL Ubuntu distribution. From the project root:
+The classifier was trained on **200 synthetic, heuristic-labeled examples** and is not validated for industrial hazard detection. `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` are classifier outputs; the dashboard's SAFE/WARNING labels are a separate presentation concept.
+
+## API
+
+| Endpoint | Operation |
+|:--|:--|
+| `GET /health` | Process health |
+| `POST /api/devices/device1/data` | Camera-derived worker counts |
+| `POST /api/devices/device2/data` | Weight measurement |
+| `POST /api/devices/device3/data` | Infrared beam update and possible inference trigger |
+| `POST /api/devices/device4/data` | Encoder rotation and RPM |
+| `POST /api/devices/device5/data` | Distance measurement |
+| `GET /api/devices/{device_id}` | Latest in-memory reading |
+| `GET /api/snapshot` | All currently known readings |
+| `POST /api/risk-assessment` | Separate caller-provided risk handoff |
+
+**Example** (development server started on port 8001):
+
+```bash
+curl -fsS -X POST 'http://127.0.0.1:8001/api/devices/device1/data' -H 'Content-Type: application/json' -d '{"zone_person_count":2,"total_person_count":5}'
+```
+
+Layer 2 sends oneM2M HTTP `PUT` using `eg:Device1`–`eg:Device6` wrappers, with `X-M2M-Origin`, `X-M2M-RI` and `X-M2M-RVI`. The success check requires **HTTP 200**, **`X-M2M-RSC: 2004`**, and a matching response request ID. The controller must be configured with already existing Resource IDs from the MN-CSE seed DB; it does not automatically discover or create them.
+
+## Local WSL development
+
+Prepare the project-root `.env` with the correct MN-CSE address and existing Resource IDs. Start the MN-CSE first.
 
 ```bash
 cd AI-AE
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-```
-
-Start the optional Mock PLC first in its own WSL terminal:
-
-```bash
-cd AI-AE
-source .venv/bin/activate
-python -m mec_safety.demo_plc_server
-```
-
-Then start AI-AE in another WSL terminal:
-
-```bash
-cd AI-AE
-source .venv/bin/activate
 python -m uvicorn mec_safety.app:app --host 127.0.0.1 --port 8001
 ```
 
-## Layer 2 configuration
-
-The CSE URL, Base Name, RVI, AE identity, and six Resource IDs are loaded from the project-root
-`.env` by `mec_safety/config.py`. Layer 2 uses the resource-specific wrappers observed in the CSE
-GET responses (`eg:Device1` through `eg:Device6`). Resource IDs are URL-encoded and
-appended to the configured CSE URL. The application does not register the AE or create
-resources.
-
-The sensor HTTP body contains measurements only. Layer 1 captures the UTC receive time
-after validation and passes it alongside the measurements through the in-process handoff.
-Layer 2 adds that value as `received_at` to the CSE resource body. The separate risk
-handoff similarly adds its UTC invocation time as `evaluated_at`. Latest-state snapshots
-continue to contain only the original sensor measurement fields.
-
-The trigger hook receives the device ID, current measurement, previous measurement (if any),
-and a snapshot including the just-received value. Inference runs only for a `device3` update
-with `beam_blocked: true` when the latest `device4` state has `is_rotating: true`. The model
-uses the camera person counts, encoder speed, and distance measurement to predict `LOW`,
-`MEDIUM`, `HIGH`, or `CRITICAL`; `triggered` is true for `HIGH` and `CRITICAL`. The latest
-prediction and confidence are available in the in-process `SensorTriggerEngine` state and its
-prediction is normalized to the Risk FCNT's title-case labels and sent to Device6 after the
-sensor update succeeds. The sensor response includes `risk_assessment`, `risk_evaluated_at`,
-and `risk_handoff` when inference ran. A failed risk handoff returns HTTP 502 and includes
-both the successful sensor handoff and failed risk handoff details.
-Valid sensor updates continue to Layer 2 regardless of whether a trigger is reported.
-
-## HTTP endpoints
-
-### Sensor ingestion
-
-```http
-POST /api/devices/device1/data
-Content-Type: application/json
-
-{"zone_person_count": 5, "total_person_count": 18}
-```
-
-### Latest device data
-
-```http
-GET /api/devices/device1
-```
-
-### Full snapshot
-
-```http
-GET /api/snapshot
-```
-
-### Risk-assessment handoff
-
-```http
-POST /api/risk-assessment
-Content-Type: application/json
-
-{"risk_level": "High", "speed_rpm": 86.5, "distance_cm": 42.8}
-```
-
-### Continuous mock sensor sender
-
-With MEC running on port 8001, send the packaged CSV rows continuously, excluding each row's
-`risk_level` label so the MEC model makes its own prediction:
+**In a separate AI-AE terminal:**
 
 ```bash
 cd AI-AE
 source .venv/bin/activate
-python -m mec_safety.send_mock_data --interval-seconds 1
+python -m mec_safety.send_mock_data --once
 ```
 
-The sender posts device1, device2, device4, device5, then device3 for each sample so the final
-request triggers inference. Device6 risk forwarding is reported for each sample. These requests
-use the configured Layer 2 connection and write to the real CSE; press `Ctrl+C` to stop. Use
-`--once` to send just the first sample, or `--base-url` to select another MEC URL.
+This sender writes to the **actual configured CSE**, not a test-only database. For a continuous simulation use `python -m mec_safety.send_mock_data --interval-seconds 1` and stop with `Ctrl+C`.
 
-## Notes
+**Optional Mock PLC:** start `python -m mec_safety.demo_plc_server` in a separate terminal before starting AI-AE to test the simulated STOP path.
 
-- Layer 2 performs oneM2M UPDATE only; it does not perform AE registration, resource
-  creation, retrieval, deletion, or direct database access.
-- There is no database or time-series history storage.
-- The packaged classifier was trained on synthetic rule-labeled mock data for software/demo
-  validation only; its predictions and confidence are not validated industrial safety results.
-- No request retries or custom timeout policy are configured.
-- The application tests use HTTPX `MockTransport`; they do not send writes to tinyIoT.
-- The ML sensor-flow smoke test is `python -m pytest -q tests/test_sensor_trigger_engine.py`; it sends
-  sensor requests without risk labels and exercises the packaged classifier.
-- A read-only CSE check is available with `python tests/check_cse_connection.py`. It checks
-  configuration, TCP, CSE Base retrieval, and the six configured FCNTs using GET only.
-- The CSE check reports Resource ID matches and schema results without printing values loaded
-  from `.env`.
+## Verification
 
-# Rationale for Adopting an Option C–Based Architecture and Selecting System Components
+```bash
+cd AI-AE
+source .venv/bin/activate
+python -m pytest -q
+python tests/check_cse_connection.py
+```
 
-## 1. Background of Architecture Selection
+The Python tests use HTTPX MockTransport and therefore **do not write to TinyIoT**. The separate connection checker is read-only. For source-run integration see [`scripts/verify-mec.sh`](../scripts/verify-mec.sh) from the project root; its mock sender **does** modify the active CSE runtime DB.
 
-This system adopts **Deployment Option C**, as presented in ETSI GR MEC-DEC 050, as its reference architecture.
+## Implementation boundaries
 
-Option C describes an architecture in which the MEC Platform and the oneM2M MN-CSE are deployed on the same physical Edge Node. This arrangement reduces unnecessary data transfers and information exchanges between the two platforms and enables data processing within the edge environment.
+- Timestamp fields (`received_at`, `evaluated_at`) are injected during forwarding, not supplied by the sensor sender.
+- Layer 2 has no independent queue or database and no general retry/timeout policy. The mock sender may retry its own HTTP requests.
+- The input cache does not guarantee a maximum age for every feature, and the optional PLC simulation is neither transactional with CSE writes nor a physical safety function.
+- The released MEC package starts AI-AE and MN-CSE; the Mock PLC demo is a separate optional source-run component.
 
-Similarly, the proposed system operates an AI Application and a oneM2M CSE within a MEC environment. The AI Application receives data from external devices, performs analysis, and forwards the necessary information to the CSE. Therefore, the system's deployment structure is consistent with the co-location approach presented in Option C.
+**Key source:** [`app.py`](mec_safety/app.py) · [`sensorTriggerEngine.py`](mec_safety/sensorTriggerEngine.py) · [`layer2.py`](mec_safety/layer2.py) · [`train_risk_model.py`](mec_safety/train_risk_model.py).
 
-However, not all components and functionalities described in Option C have been adopted. Instead, the architecture has been selectively adapted to reflect the actual requirements and implementation scope of the proposed system.
+## Option C-inspired architecture rationale
 
-## 2. Rationale for Excluding Specific Components and Functionalities
+The **co-location idea** is drawn from [ETSI GR MEC-DEC 050, Deployment Option C](https://www.etsi.org/deliver/etsi_gr/MEC-DEC/001_099/050/04.01.01_60/gr_MEC-DEC050v040101p.pdf). The implementation places the FastAPI AI-AE process and TinyIoT MN-CSE process together on **Computer A**, a MEC-*oriented* edge node. **It does not deploy or register with an operational ETSI MEC Platform.** The AI-AE communicates over oneM2M HTTP to seeded resources, but its code does **not** create/register an `m2m:ae` resource in the CSE.
 
-### 2.1. Exclusion of Multiple Application Entities (AEs)
+### Why not deploy multiple MN-AEs?
 
-Option C illustrates several MN-AEs operating as independent applications, including Swarm Computing, Federated Learning, and third-party Interworking Proxy Entities (IPEs).
+Input validation, latest-state maintenance, sensor-triggered model invocation and oneM2M writes are implemented in **one** Python application, with separate MN-CSE and (optional) Mock PLC processes. There are no independently registered swarm-computing, federated-learning or third-party IPE AEs. A software module performing JSON → `eg:DeviceN` mapping offers an **interworking-like function**; this alone does not establish a complete oneM2M IPE implementation or a multi-protocol industrial gateway.
 
-However, the proposed system does not require multiple independent applications to perform separate services. Instead, a single AI Application receives data from multiple devices and performs AI-based analysis and decision-making.
+### Why omit swarm computing and federated learning?
 
-Accordingly, rather than deploying multiple AEs separately, the system employs a single AI Application as its MN-AE.
+The project uses a single Gradient Boosting model trained on synthetic demonstration data. It does not exchange model parameters among edge nodes, perform federated aggregation, or coordinate a distributed swarm. Those options are outside the implemented scope.
 
-### 2.2. Exclusion of Swarm Computing and Federated Learning
+### What devices and resources are actually used?
 
-Swarm Computing and Federated Learning, as illustrated in Option C, are intended to support collaborative computation and distributed model training across multiple edge environments or applications.
+Current inputs are **simulated non-oneM2M sensor measurements submitted over HTTP**; real production cameras, proprietary device-protocol adapters and MEC Devices have not been validated. Validated values update six specialized **SDT-based FlexContainers (type 28)** in the MN-CSE. This project does **not** write its primary sensor/risk values to a Container/ContentInstance time-series tree. The state in `MN-CSE/runtime/data.db` is the mutable resource store; the seed DB is only an initialization source.
 
-The primary objective of the proposed system is to collect device data within a single MEC environment, analyze the collected information using an AI Application, and store the resulting data in a oneM2M CSE.
+### Is an IN-CSE included?
 
-Since the system does not perform collaborative computation across multiple edge nodes or distributed model training, these functionalities have been excluded from the current implementation scope.
+**Yes.** The integration branch contains a separately deployed **Monitoring Node (Computer B)** with TinyIoT IN-CSE and a Dashboard. The MN-CSE on Computer A has a Remote CSE registration/retry path; the Dashboard backend queries its local IN-CSE, which forwards oneM2M SP-relative GET requests to the registered MN-CSE POA. This is **not a Cloud IN-CSE deployment** and has not been verified on two physical hosts by the published local WSL/loopback test. Claiming that all IN-CSE/Mcc functionality was excluded is inaccurate.
 
-### 2.3. Exclusion of a Separate Third-Party Interworking Proxy Entity (IPE)
+### Selected elements and omissions
 
-Option C represents the third-party IPE as a separate MN-AE responsible for interoperability between Non-oneM2M Devices and the oneM2M platform.
+| Element | Selected implementation | Not claimed |
+|:--|:--|:--|
+| Edge AI-AE and MN-CSE co-location | Separate processes on Computer A; oneM2M HTTP PUT | MEC Platform orchestration or ETSI service-registration APIs |
+| Data adapter | Application-side validation and `eg:DeviceN` mapping | Separate registered third-party IPE |
+| Machine learning | One locally executed model with synthetic training data | Federated or distributed training |
+| Device representation | Six predefined, schema-checked FlexContainers | Primary Container/ContentInstance history |
+| Remote monitoring | IN-CSE and Dashboard on Computer B | Cloud IN-CSE, automatic handover or validated multi-host LAN |
+| Emergency response | Direct TCP Mock PLC STOP simulator | Safety-certified physical actuator control |
 
-In the proposed system, however, a single AI Application directly receives data from external devices, processes the received information, and forwards both the necessary original data and analysis results to the oneM2M CSE.
-
-Therefore, device data acquisition and processing are handled within the AI Application, eliminating the need to deploy a separate third-party IPE application.
-
-Nevertheless, if the AI Application internally performs functions such as translating device-specific protocols into oneM2M resource structures or synchronizing device functionalities with corresponding oneM2M resources, those internal functions may be identified as fulfilling the role of an IPE.
-
-### 2.4. Exclusion of oneM2M Devices and MEC Devices
-
-The external devices that provide data to the proposed system are classified as **Non-oneM2M Devices**, as they do not directly support the oneM2M standard.
-
-Consequently, oneM2M Devices and MEC Devices have not been included as separate architectural components.
-
-Data from each external device is transmitted to the AI Application through its respective communication mechanism. The AI Application then selects the necessary information and stores it in the CSE.
-
-### 2.5. Exclusion of Cloud IN-CSE and IN-AE Components
-
-The current implementation does not establish a separate cloud-based IN-CSE to provide centralized service management and data synchronization through integration with the edge MN-CSE.
-
-Accordingly, the Cloud IN-CSE, IN-AE, and the associated Mcc interworking between these components have been excluded from the current implementation architecture.
-
-If integration with a cloud-based oneM2M platform or centralized data synchronization and management across multiple edge CSEs become necessary, these components may be incorporated in future extensions.
-
-## 3. Final Architecture Configuration
-
-The proposed system preserves the fundamental deployment structure of Option C while incorporating only the components necessary for its actual implementation.
-
-The final architecture consists of the following components:
-
-- **Non-oneM2M Devices:** Multiple external devices responsible for providing input data.
-- **AI Application (MN-AE):** Responsible for receiving device data, performing AI-based analysis and decision-making, and selecting the information to be stored.
-- **oneM2M MN-CSE:** Responsible for managing device-specific original data and AI analysis results through Container and ContentInstance resources.
-- **MEC Platform:** Provides the MEC execution environment and associated service functionalities.
-
-The AI Application and MN-CSE are deployed within the same MEC environment while operating as separate execution components.
-
-The AI Application accesses the MN-CSE through the **Mca reference point**, organizes device-specific information into separate Container resources, and manages individual data records as ContentInstance resources.
-
-As a result, the proposed system adopts a simplified MEC–oneM2M integration architecture based on Deployment Option C. It retains the core co-location principle while excluding components that are unnecessary for the current implementation objectives, including multiple independent AEs, distributed computing and learning functionalities, and a separate IPE application.
+The system should therefore be described as **an Option C-inspired, co-located MEC–oneM2M software prototype with a separate Monitoring IN-CSE**, not a complete realization of every Option C platform, AE, IPE or cloud capability. The main project's [architecture and configuration reference](../README.md#option-c-inspired-component-selection) describes the full two-node layout.
