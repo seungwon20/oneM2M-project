@@ -22,7 +22,7 @@ The project has **two separately deployable nodes**:
 | **Computer A — MEC-oriented node** | FastAPI **AI-AE** + modified **TinyIoT MN-CSE** | Validate sensor measurements, conditionally infer risk, update oneM2M FlexContainers, and optionally send a simulated PLC STOP |
 | **Computer B — Monitoring node** | **TinyIoT IN-CSE** + **PinchGuard Dashboard** | Accept remote-CSE registration, route oneM2M read requests to the MN-CSE, poll six device resources, and display telemetry, status, and events |
 
-The source for **all four primary components** is present on the [`integration/in-cse-dashboard` branch](https://github.com/seungwon20/oneM2M-project/tree/integration/in-cse-dashboard). The two Linux x86_64 binary archives and their SHA-256 files are published in [release `v0.1.0-hackathon`](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon); the release tag and this branch currently identify the **same source commit**.
+The source for **all four primary components** is present on the [`integration/in-cse-dashboard` branch](https://github.com/seungwon20/oneM2M-project/tree/integration/in-cse-dashboard). The two Linux x86_64 binary archives and their SHA-256 files are published in [release `v0.1.0-hackathon`](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon); the release tag identifies the archive build revision, while this integration branch has since received documentation updates. **Editing the current branch does not alter the already-published `.tar.gz` files.**
 
 The term **MEC-oriented** refers to the placement of analytics close to the CSE on an edge node. This code does **not** establish operational ETSI MEC platform service registration, orchestration, or safety-certified equipment control.
 
@@ -56,12 +56,16 @@ flowchart LR
 
 - [Published packages](#published-packages)
 - [Architecture](#architecture)
+- [Option C-inspired component selection](#option-c-inspired-component-selection)
 - [oneM2M resource model](#onem2m-resource-model)
 - [AI inference and simulated response](#ai-inference-and-simulated-response)
 - [Install the published packages](#install-the-published-packages)
 - [Configure the two nodes](#configure-the-two-nodes)
+- [Configuration reference](#configuration-reference)
 - [Verify a running deployment](#verify-a-running-deployment)
+- [Troubleshooting and data preservation](#troubleshooting-and-data-preservation)
 - [Build and test from source](#build-and-test-from-source)
+- [Source layout and development conventions](#source-layout-and-development-conventions)
 - [Dashboard functionality and APIs](#dashboard-functionality-and-apis)
 - [Security and data handling](#security-and-data-handling)
 - [Verification and evidence](#verification-and-evidence)
@@ -142,6 +146,22 @@ sequenceDiagram
 | Browser → Dashboard | `http://<monitoring-node-address>:8000` by default |
 
 Both CSE HTTP listeners may bind to `0.0.0.0`; a **POA-advertised address is not the same concept as a listener bind address**. `127.0.0.1` is never a valid *remote computer's* address.
+
+## Option C-inspired component selection
+
+The design **borrows the edge co-location principle** described as Deployment Option C in [ETSI GR MEC-DEC 050, clause 6.4.2.3](https://www.etsi.org/deliver/etsi_gr/MEC-DEC/001_099/050/04.01.01_60/gr_MEC-DEC050v040101p.pdf): the edge application and oneM2M MN-CSE reside on the same computing node. This is an **architectural reference**, not proof of a deployed ETSI MEC Platform, MEC service APIs or MEC orchestration.
+
+| Option C-related element | PinchGuard adaptation | Implemented boundary |
+|:--|:--|:--|
+| Edge application and oneM2M MN-CSE | One FastAPI AI-AE process and a separate MN-CSE process on Computer A | Local oneM2M HTTP `PUT`, rather than a certified MEC platform deployment |
+| Multiple specialized MN-AEs | Only one integrated sensor-processing and inference application is implemented | The software is called *AI-AE*, but does **not** register an `m2m:ae` resource at runtime |
+| Third-party IPE | Application-side device JSON validation and mapping to `eg:DeviceN` FlexContainers | No separately deployed/registered IPE and no validated heterogeneous industrial-protocol gateway |
+| Swarm computing and federated learning | Omitted | A single synthetic-data-trained model; no distributed training or edge swarm |
+| Non-oneM2M input devices | Simulated HTTP sensor producers | No demonstrated physical production sensor integration |
+| Cloud IN-CSE and IN-AE | No cloud-hosted oneM2M service | **A separate, non-cloud Monitoring Node IN-CSE is implemented** for remote CSE registration and routed reads |
+| oneM2M resource storage | Six **SDT-backed FlexContainers**, updated by Resource ID | Does **not** persist these measurements as a `Container`/`ContentInstance` history |
+
+**Deployment distinction:** Computer A hosts the co-located edge analytics and MN-CSE; Computer B hosts the IN-CSE and Dashboard. The remote-CSE relationship belongs to the monitoring topology; it is not a claim that a cloud infrastructure node was deployed. The Dashboard polls the IN-CSE rather than the MN-CSE directly. Detailed component trade-offs are also explained in [the AI-AE README](AI-AE/README.md#option-c-inspired-architecture-rationale).
 
 ## oneM2M resource model
 
@@ -339,6 +359,49 @@ Browse `http://<Computer-B-address>:8000` from an allowed client. Health checks 
 
 Run that command **only from the Monitoring package directory**. For Computer A, use `./scripts/stop-mec` from the MEC package directory.
 
+## Configuration reference
+
+The source checkout and the two binary packages have **different configuration lifecycles**. This section consolidates the earlier standalone configuration guide; use the installation steps above for the actual order of operations.
+
+| Configuration file | Used by | Lifecycle |
+|:--|:--|:--|
+| Project-root `.env.example` → `.env` | Source development and package builders | Edit before CSE source builds; never commit `.env` |
+| `packaging/mec/templates/.env.example` → extracted MEC `config/.env` | Computer A package | Created by `./scripts/configure-mec`; values from seed/build metadata plus operator inputs |
+| `packaging/monitoring/templates/.env.example` → extracted Monitoring `config/.env` | Computer B package | Created by `./scripts/configure-monitoring`; generated resource identifiers plus operator inputs |
+| `Dashboard/.env.example` → `Dashboard/.env` | Source-run Dashboard only | Export variables into the development shell; not a binary-package configuration file |
+
+### MEC application and CSE settings
+
+| Variable(s) | Meaning and constraints |
+|:--|:--|
+| `CSE_BASE_URL`, `CSE_BASE_NAME`, `CSE_RVI` | AI-AE → **local** MN-CSE origin/base and oneM2M release indicator; default local URL `http://127.0.0.1:3000` |
+| `AE_NAME`, `AE_ID` | AI application label and outgoing oneM2M originator; `AE_ID` is used by the configured access policy, **not proof of AE registration** |
+| `FCNT_DEVICE1_RI` … `FCNT_DEVICE5_RI`, `FCNT_RISK_RI` | Six fixed, seeded FlexContainer Resource IDs; `FCNT_RISK_RI` is Device6 |
+| `TINYIOT_SERVER_TYPE`, `TINYIOT_SERVER_IP`, `TINYIOT_SERVER_PORT` | CSE kind (`mn`), **advertised** Computer A POA address, listener port (normally `3000`) |
+| `TINYIOT_CSE_BASE_NAME`, `TINYIOT_CSE_BASE_RI`, `TINYIOT_CSE_BASE_SP_ID` | Fixed CSE identity and service-provider value; checked against seed/build metadata |
+| `REMOTE_CSE_ID`, `REMOTE_CSE_NAME` | Paired Monitoring IN-CSE identifier and base name from its `config/build-info.json` |
+| `REMOTE_CSE_HOST`, `REMOTE_CSE_PORT` | Reachable Computer B IN-CSE host **without URL scheme**, and HTTP port (normally `3001`) |
+| `AI_AE_HOST`, `AI_AE_PORT` | FastAPI binding (package defaults are local `127.0.0.1:8001`); opening it beyond the host requires its own network/security review |
+
+### IN-CSE and Dashboard settings
+
+| Variable(s) | Meaning and constraints |
+|:--|:--|
+| `IN_CSE_SERVER_IP`, `IN_CSE_SERVER_PORT` | Computer B's advertised IN-CSE POA and listener port; **remote computer A must reach this address** |
+| `IN_CSE_CSE_BASE_NAME`, `IN_CSE_CSE_BASE_RI`, `IN_CSE_CSE_BASE_SP_ID`, `IN_CSE_RVI` | **Source-build** IN-CSE identity/SP ID/RVI; the binary builder packages a compatible fixed identity and RVI |
+| `IN_CSE_ALLOWED_REMOTE_CSE_ID` | **Source-build** remote MN-CSE allowlist; do not confuse an allowlist definition with a successful cross-host test |
+| `IN_CSE_ADMIN_AE_ID` | Optional privileged **development** originator; should not be enabled to bypass deployed least-privilege policy |
+| `PG_IN_CSE_URL`, `PG_MN_CSE_ID` | Dashboard → local IN-CSE URL (typically `http://127.0.0.1:3001`) and the paired remote MN-CSE identifier |
+| `PG_MN_DEVICE1_RI` … `PG_MN_DEVICE6_RI` | Device1–6 Resource IDs, generated from package metadata; do not invent or mix between unrelated package builds |
+| `PG_IN_CSE_ORIGIN`, `PG_IN_CSE_RVI` | Dashboard oneM2M originator and release indicator; in this packaged demo `PG_IN_CSE_ORIGIN` matches MEC `AE_ID` |
+| `PG_IN_CSE_TIMEOUT`, `PG_MN_CSE_POLL_SECONDS`, `PG_MN_CSE_FRESH_SECONDS` | HTTP timeout, default **10 s** polling interval, and source-reading freshness window (default **30 s**) |
+| `PG_DASHBOARD_HOST`, `PG_DASHBOARD_PORT` | Browser-facing Dashboard bind/address; default package values are `0.0.0.0:8000` |
+| `PG_DB_PATH`, `PG_FRESH_SECONDS` | Dashboard SQLite runtime path and local state freshness window |
+| `PG_INGEST_KEY`, `PG_NOTIFY_TOKEN` | Ingestion key (minimum 16 characters in the package controller) and optional notification verification token |
+| `PG_ENABLE_DEMO`, `PG_DEMO_SEED` | Demo mode/sample seeding; use `0`/`0` to evaluate actual CSE polling instead of local demonstration events |
+
+**Important first-start invariant:** Monitoring passes `PG_IN_CSE_ORIGIN` into its IN-CSE process as `IN_CSE_DASHBOARD_ORIGINATOR`. The IN-CSE's initial access-control state can depend on that originator. Choose it **before the first boot and initial DB creation**; updating an environment variable afterward does not necessarily migrate an already-created ACP. Restrict permissions on both packages' `config/.env` and never publish their real keys.
+
 ## Verify a running deployment
 
 Use the following checks in order. Treat **PASS**, **FAIL** and **NOT TESTED** as different outcomes.
@@ -356,6 +419,21 @@ Use the following checks in order. Treat **PASS**, **FAIL** and **NOT TESTED** a
 Use logs beneath each package's `runtime/logs/`; PID state is under `runtime/pid/`. A failed individual remote device GET is isolated by the Dashboard backend; inspect per-device errors rather than relying on an aggregate green status alone.
 
 **Default ports:** Computer A MN-CSE `3000`, AI-AE `8001`; Computer B IN-CSE `3001`, Dashboard `8000`; optional source-run Mock PLC `9001`. Restrict inbound exposure to the paths actually required.
+
+## Troubleshooting and data preservation
+
+| Symptom | Verify first | Avoid this misdiagnosis |
+|:--|:--|:--|
+| MEC starts but Dashboard shows no devices | MN-CSE's Remote CSE registration state; `REMOTE_CSE_*`; both advertised POAs; IN-CSE originator and permissions | `GET /health` succeeding does **not** mean CSE forwarding succeeded |
+| Dashboard `configured=true`, `connected=false` | `PG_MN_CSE_ID`, six seed Resource IDs, IN-CSE availability, RVI, and each device-specific error | Polling configured is not evidence of retrieved telemetry |
+| Only some Device1–6 requests fail | Individual resource RI, schema and response, ACL/originator and staleness | A single device failure does not imply all devices have stopped working |
+| Monitoring package refuses first start | `PG_IN_CSE_ORIGIN`/`PG_INGEST_KEY` placeholders, local ports, originator established before initial ACL | Do **not** bypass validation by copying another node's `.env` |
+| Port reachable locally but not from other computer | TCP connectivity in **both directions**: Computer A port `3000`, Computer B port `3001`; routing, WSL host binding, VPN and firewall | A `127.0.0.1` connection proves only the same network namespace |
+| No risk result or Mock PLC STOP | Device3 `beam_blocked=true`, latest Device4 rotation, four model features, whether Mock PLC simulator is running | Missing/stale features cannot be treated as a safe inference |
+
+**Persistence and upgrades:** `MN-CSE/data.db` is the source seed. The MEC package copies that seed to **`runtime/data.db` on first startup only**. Subsequent runs retain the working DB. The Monitoring package also maintains runtime IN-CSE/Dashboard state, SQLite and logs. Stop services, back up both nodes' `runtime/` directories and preserve the CSE resource identifiers before replacing binaries. A modified seed file does not automatically migrate an existing runtime DB. No schema migration or reboot auto-restart guarantee is asserted.
+
+**Network exposure:** permit only the necessary trusted hosts/VPN through the firewall. The documented HTTP listeners are not an evaluated TLS/mTLS setup; do not put the prototype on an open Internet endpoint. Package `status-*` and `healthcheck` confirm local process/readiness, whereas **the Dashboard's per-device IN-CSE results and fresh timestamps** establish application-level data flow.
 
 ## Build and test from source
 
@@ -425,9 +503,27 @@ Each builder outputs a package directory, a `.tar.gz` archive and a `.sha256` fi
 
 For manual source runs, use [`MN-CSE/scripts/build.py`](MN-CSE/scripts/build.py), [`MN-CSE/scripts/run.py`](MN-CSE/scripts/run.py), [`IN-CSE/scripts/build.py`](IN-CSE/scripts/build.py) and [`IN-CSE/scripts/run.py`](IN-CSE/scripts/run.py). The full MEC local integration verifier is [`scripts/verify-mec.sh`](scripts/verify-mec.sh) and **writes to the active runtime DB** when it sends mock data.
 
+## Source layout and development conventions
+
+The following consolidates the component entry points and development-only cautions previously kept in separate development and packaging guides.
+
+| Subsystem | Implementation entry points | Test or artifact |
+|:--|:--|:--|
+| AI-AE input and validation | [`app.py`](AI-AE/mec_safety/app.py), [`device_schemas.py`](AI-AE/mec_safety/device_schemas.py) | [`AI-AE/tests/`](AI-AE/tests) |
+| In-memory state and inference | [`storage.py`](AI-AE/mec_safety/storage.py), [`sensorTriggerEngine.py`](AI-AE/mec_safety/sensorTriggerEngine.py) | Synthetic-trained model, **not** independent safety validation |
+| oneM2M FCNT HTTP handoff | [`layer2.py`](AI-AE/mec_safety/layer2.py), [`config.py`](AI-AE/mec_safety/config.py) | Seed RI and RVI validation, HTTP/RSC/RI checks |
+| MN-CSE/IN-CSE source build | [`MN-CSE/scripts/build.py`](MN-CSE/scripts/build.py), [`IN-CSE/scripts/build.py`](IN-CSE/scripts/build.py) | Generated `config.h`/native binaries; these are **not hand-maintained source** |
+| Dashboard backend and UI | [`Dashboard/app.py`](Dashboard/app.py), [`Dashboard/static/`](Dashboard/static) | [`Dashboard/tests/`](Dashboard/tests), IN-CSE responses mocked in unit tests |
+| Linux release package creation | [`packaging/mec/build_package.py`](packaging/mec/build_package.py), [`packaging/monitoring/build_package.py`](packaging/monitoring/build_package.py) | Linux x86_64 `dist/` directory, `.tar.gz`, `.sha256`; outputs refused if already present |
+| End-to-end *local* source simulation | [`scripts/verify-mec.sh`](scripts/verify-mec.sh) | **Mutates live MN-CSE runtime resources**; not a read-only test |
+
+When source-building MN-CSE, `python3 MN-CSE/scripts/build.py --init-local-env` can initialize a local template **and then continue into build validation**; missing seed IDs or SP ID may still make the command fail. Check the generated root `.env`, fill valid values and then rerun the build. Do not copy real `.env` files, generated C headers, runtime DBs, `.venv` directories or packaged binaries to Git. For a concise four-terminal demonstration see [`AI-AE/How to use.md`](AI-AE/How%20to%20use.md); for the dashboard's synthetic risk-level demonstration see [`Dashboard/README_CRITICAL.md`](Dashboard/README_CRITICAL.md).
+
+The GitHub branch may contain development documentation that post-dates release `v0.1.0-hackathon`. The published archives do **not** pick up subsequent README or configuration edits automatically; re-run the builders, retest, publish new checksums and use a versioned release if package contents must change.
+
 ## Dashboard functionality and APIs
 
-The [Dashboard backend](Dashboard/app.py) provides a web UI, a local SQLite event store, optional API-key-protected ingestion paths, simulated camera/frame support, event acknowledgement, live/demo display modes, and a background IN-CSE polling worker.
+The [Dashboard backend](Dashboard/app.py) (see the [component README](Dashboard/README.md)) provides a web UI, a local SQLite event store, optional API-key-protected ingestion paths, simulated camera/frame support, event acknowledgement, live/demo display modes, and a background IN-CSE polling worker.
 
 | HTTP endpoint | Purpose |
 |:--|:--|
@@ -499,8 +595,7 @@ oneM2M-project/
 │   ├── mec/                        # Linux MEC builder, runtime CLI and package README
 │   └── monitoring/                 # Linux Monitoring builder, runtime CLI and README
 ├── scripts/verify-mec.sh          # Source-run WSL integration check
-├── assets/                         # Screenshots used by this README (add from this bundle)
-├── docs/                           # Earlier per-topic docs; consolidate only after link cleanup
+├── assets/                         # Three recorded demonstration screenshots
 └── .env.example                    # Development/packaging configuration template
 ```
 
@@ -569,6 +664,7 @@ Two physical hosts, bidirectional reachability, Remote CSE registration/forwardi
 - [oneM2M official website](https://www.onem2m.org/)
 - [oneM2M specifications](https://www.onem2m.org/standards)
 - [TinyIoT project (upstream reference)](https://github.com/Mindlestick/TinyIoT)
+- [ETSI GR MEC-DEC 050, Option C architectural reference](https://www.etsi.org/deliver/etsi_gr/MEC-DEC/001_099/050/04.01.01_60/gr_MEC-DEC050v040101p.pdf)
 
 ---
 
