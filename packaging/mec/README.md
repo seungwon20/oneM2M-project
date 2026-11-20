@@ -1,51 +1,77 @@
-# MEC Package
+# PinchGuard MEC Package — Computer A
 
-This package contains the AI-AE service and TinyIoT MN-CSE for Linux x86_64. It does not
-include a developer Python installation requirement; AI-AE and the package controller are
-bundled with their Python runtime. The TinyIoT executable still requires its linked Linux
-runtime libraries, including OpenSSL and libwebsockets.
+**Linux x86_64 · FastAPI AI-AE + TinyIoT MN-CSE**  
+[Project overview and two-node installation](../../README.md) · [Release downloads](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon)
 
-## Initial configuration
+This is the **source README copied into the MEC package by the builder**. The bundle includes the AI-AE runtime and trained synthetic-data model, a native TinyIoT MN-CSE executable, the seed database, SDT definitions, configuration metadata, and scripts for configuration, health checks, service start and stop. It does **not** include the Monitoring node or the optional source-only Mock PLC.
 
-After extraction, create the package-local configuration:
+## Package layout
+
+```text
+MEC-Package-Linux-x86_64/
+├── bin/ai-ae/                 # Bundled FastAPI runtime
+├── bin/mec-control/           # CLI service controller
+├── bin/tinyiot-mn-cse         # Native Linux executable
+├── config/.env.example
+├── config/build-info.json
+├── data/seed.db
+├── models/risk_model.joblib
+├── share/sdt_definitions/
+├── runtime/logs/              # Runtime output
+├── runtime/pid/
+├── scripts/
+│   ├── configure-mec
+│   ├── start-mec
+│   ├── status-mec
+│   ├── healthcheck
+│   └── stop-mec
+└── README.md
+```
+
+## First-time installation
+
+From the extracted package directory:
 
 ```bash
 ./scripts/configure-mec
+nano config/.env
 ```
 
-Edit `config/.env` and set:
+`configure-mec` derives the CSE and **six Resource IDs** from the bundled seed and generates `config/.env` without overwriting an existing file. Complete the user-specific settings:
 
-- `AE_ID`: the Originator accepted by this CSE
-- `TINYIOT_SERVER_IP`: the MEC node's reachable LAN address advertised in the CSE POA
-- `REMOTE_CSE_ID`, `REMOTE_CSE_NAME`, `REMOTE_CSE_HOST`, `REMOTE_CSE_PORT`: the matching
-  IN-CSE identity and reachable Monitoring Node endpoint from the companion Monitoring Package
+| Setting | Required value |
+|:--|:--|
+| `AE_ID` | Originator accepted by the CSE; match the paired Monitoring `PG_IN_CSE_ORIGIN` for this demo |
+| `TINYIOT_SERVER_IP` | Computer A address reachable from Computer B, advertised in the MN-CSE POA |
+| `REMOTE_CSE_ID` | IN-CSE identifier in the paired Monitoring `config/build-info.json` |
+| `REMOTE_CSE_NAME` | Corresponding IN-CSE base name |
+| `REMOTE_CSE_HOST` | Monitoring node's reachable hostname/IP, without scheme or port |
+| `REMOTE_CSE_PORT` | IN-CSE port, normally `3001` |
 
-The configure command fills the CSE Base and Device1-Device6 Resource IDs from the bundled
-seed database without printing them. The service-provider ID is included in build metadata
-because the seed database does not store it. Keep the seed-derived values aligned with that
-database. The AI-AE connects locally using `CSE_BASE_URL`; Dashboard clients must use the MEC
-node's LAN address, not `127.0.0.1`.
+The localhost `CSE_BASE_URL` connects **AI-AE to MN-CSE inside Computer A**. It is not the address of Computer B and should not be replaced with the remote node address. Do not change seed-derived Resource IDs, base identity or RVI without regenerating a compatible pair of packages.
 
-## Service commands
+**Recommended order:** configure and start the Monitoring node first, then configure/start MEC. The MN-CSE includes a retry worker for temporarily unavailable IN-CSE registration.
+
+## Runtime commands
 
 ```bash
 ./scripts/start-mec
 ./scripts/status-mec
 ./scripts/healthcheck
+```
+
+Startup validates configuration and seed mappings, initializes `runtime/data.db` on first run only, launches MN-CSE and waits for a healthy CSE Base, then starts AI-AE and checks `/health`.
+
+Shutdown:
+
+```bash
 ./scripts/stop-mec
 ```
 
-Startup validates configuration, initializes `runtime/data.db` only if it does not exist,
-starts MN-CSE, waits for a successful CSE Base response, then starts AI-AE and checks its
-`/health` endpoint. Logs and PID files are stored under `runtime/`. Stop signals are sent to
-the recorded package processes; unrelated processes are not signalled.
+**Readiness ≠ remote connectivity.** These commands establish local process and endpoint readiness, not an independently verified IN-CSE routing path or safety system.
 
-## Database and updates
+Logs and PID files reside under `runtime/logs/` and `runtime/pid/`. Back up `runtime/` before upgrading. Subsequent starts **preserve** the existing runtime database. The native executable may still need compatible OpenSSL/libwebsockets runtime libraries on the target Linux host.
 
-`data/seed.db` and `share/sdt_definitions/` are package inputs. First start copies the seed to
-`runtime/data.db`; subsequent starts preserve the runtime database. Back up `runtime/` before
-upgrading the package.
+## Verification boundary
 
-The current package is built for Linux x86_64 only. The complementary Monitoring Package contains
-TinyIoT IN-CSE and the integrated PinchGuard Dashboard; build and two-node deployment status are
-described in the repository's packaging and deployment guides.
+Published `v0.1.0-hackathon` release notes report joint local **WSL loopback testing**, not fresh-host deployment, two-computer LAN or firewall testing. An operational ETSI MEC platform and production-grade authentication/TLS are outside this demonstrated scope. Do not interpret an optional Mock PLC STOP as physical actuation.
