@@ -437,10 +437,10 @@ Use logs beneath each package's `runtime/logs/`; PID state is under `runtime/pid
 
 ## Build and test from source
 
-The steps below are for **contributors**, not users of the self-contained release archives. Use the **`integration/in-cse-dashboard` checkout**, not a `main` checkout that omits the additional components.
+The steps below are for contributors working with the source code, not users of the published binary packages. The default `main` branch contains all four primary components.
 
 ```bash
-git clone --branch integration/in-cse-dashboard --single-branch https://github.com/seungwon20/oneM2M-project.git
+git clone https://github.com/seungwon20/oneM2M-project.git
 cd oneM2M-project
 sudo apt-get update
 sudo apt-get install -y build-essential pkg-config libssl-dev libwebsockets-dev python3-venv
@@ -559,7 +559,6 @@ The source [`Dashboard/camera_sender.py`](Dashboard/camera_sender.py) supports s
 | [MN-CSE local verifier](scripts/verify-mec.sh) and previous project test records | Same-WSL sensor updates, Device6 risk write and optional Mock PLC responses were exercised | Two-host LAN integration or physical STOP |
 | [`Dashboard/tests/`](Dashboard/tests) | Backend API behavior, notification handling, mocked IN-CSE routes and synthetic sender tests | Actual remote CSR registration and forwarding |
 | [`packaging/monitoring/tests/`](packaging/monitoring/tests) | Monitoring configuration and control behavior represented in unit tests | Clean-host installation/reboot lifecycle |
-| [oneM2M PUT screenshot](assets/postman-device6-put.jpg) | Manual Device6 PUT returned HTTP success in the recorded demo | An automatically correlated AI-AE → IN-CSE → Dashboard transaction |
 | [Published v0.1.0 release](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon) | Linux x86_64 MEC and Monitoring packages and SHA-256 files are publicly downloadable | Verified two-computer topology; release notes explicitly limit validation to one WSL/loopback environment |
 
 The prior project documentation records **22 passing AI-AE tests** and **27 passing AI-AE + MEC packaging tests** in its earlier WSL environment. These counts are *historical reported results*, **not** tests rerun for this README. No new assertion of passing end-to-end two-host tests is made.
@@ -595,7 +594,6 @@ oneM2M-project/
 │   ├── mec/                        # Linux MEC builder, runtime CLI and package README
 │   └── monitoring/                 # Linux Monitoring builder, runtime CLI and README
 ├── scripts/verify-mec.sh          # Source-run WSL integration check
-├── assets/                         # Three recorded demonstration screenshots
 └── .env.example                    # Development/packaging configuration template
 ```
 
@@ -610,7 +608,6 @@ The following is a **traceable evidence index**, not a self-assigned competition
 | Innovative use of oneM2M | Six specialized FlexContainers and SDT validation | Group/announcement/pollingChannel usage not demonstrated |
 | Appropriate communication protocols | oneM2M HTTP for CSE; direct TCP for Mock PLC | CoAP/MQTT are not claimed as exercised device traffic |
 | Innovative scenarios | Multi-device conditional ML, standardized writes, remote CSE-routed Dashboard | No certified industrial actuator or validated multi-host deployment |
-| Quality of Article | [Demonstration images](#demonstration-screenshots) and linked technical explanations | Actual Hackster article and video must be evaluated separately |
 | Quality of Video | Recorded dashboard + Postman demonstration | Editing/production quality not measured here |
 | Quality of GitHub | Source for AI-AE/MN-CSE/IN-CSE/Dashboard plus two builders, tests and instructions | Independent clean-host reproduction still needs testing |
 | Promotion of oneM2M | Resource model, standard headers, CSE role separation and IN-CSE forwarding rationale | Documentation is not evidence of community engagement |
