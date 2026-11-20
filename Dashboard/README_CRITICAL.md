@@ -14,18 +14,18 @@
 ### Terminal 1 — Start the Dashboard
 
 ```bash
-cd /mnt/c/Users/minea/desktop/PinchGuard_Dashboard_CRITICAL
+cd Dashboard
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt -r requirements-camera.txt
 export PG_INGEST_KEY='local-dev-change-me'
-uvicorn app:app --host 127.0.0.1 --port 8000
+python -m uvicorn app:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
 ### Terminal 2 — Start the Synthetic Data Sender
 
 ```bash
-cd /mnt/c/Users/minea/desktop/PinchGuard_Dashboard_CRITICAL
+cd Dashboard
 source .venv/bin/activate
 export PG_API_KEY='local-dev-change-me'
 python camera_sender.py --source synthetic --url http://localhost:8000/api/frame --fps 10 --cycle-seconds 24
@@ -49,6 +49,8 @@ For a faster demonstration cycle, change `--cycle-seconds 24` to `--cycle-second
 
 ## Limitations
 
-The video, sensor measurements, and risk values are generated through a **rule-based synthetic simulation**. A CRITICAL classification does **not** demonstrate detection of a real machinery entrapment incident or the ability to stop physical industrial equipment.
+The demo's generated visuals, sensor measurements, and risk values follow a **rule-based synthetic simulation**. The example thresholds below are *illustrative demonstration criteria*, **not** the trained AI-AE classifier's learned four-class decision boundary. The AI-AE writes `LOW / MEDIUM / HIGH / CRITICAL` model output into oneM2M Device6, while the dashboard demonstration uses the separate `SAFE / WARNING / HIGH / CRITICAL` presentation vocabulary. A CRITICAL classification does **not** demonstrate detection of a real machinery entrapment incident or the ability to stop physical industrial equipment.
 
-**Repository note:** The commands above preserve the original local WSL directory path. When running from the `integration/in-cse-dashboard` branch, use the repository's `Dashboard/` directory instead and configure the required environment variables for that setup.
+**Running from GitHub:** Each `cd Dashboard` command assumes a fresh terminal opened at the root of a checkout of the `integration/in-cse-dashboard` branch. Use `cd <repository-root>/Dashboard` if your terminal starts elsewhere. The `PG_INGEST_KEY`/`PG_API_KEY` string above is an **unsafe example value for an isolated local demo only**. For network-accessible environments, use a unique secret and avoid exposing the demonstration API.
+
+For real CSE-routed monitoring, refer to [the Dashboard README](README.md) and [the IN-CSE integration guide](README_MN_CSE_INTEGRATION.md); these are distinct from this local synthetic camera demo.
