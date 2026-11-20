@@ -1,7 +1,7 @@
 # PinchGuard MEC Package — Computer A
 
 **Linux x86_64 · FastAPI AI-AE + TinyIoT MN-CSE**  
-[Project overview and two-node installation](../../README.md) · [Release downloads](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon)
+[Project overview and two-node installation](https://github.com/seungwon20/oneM2M-project/blob/main/README.md) · [Release downloads](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon)
 
 This is the **source README copied into the MEC package by the builder**. The bundle includes the AI-AE runtime and trained synthetic-data model, a native TinyIoT MN-CSE executable, the seed database, SDT definitions, configuration metadata, and scripts for configuration, health checks, service start and stop. It does **not** include the Monitoring node or the optional source-only Mock PLC.
 
