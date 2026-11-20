@@ -580,3 +580,53 @@ Two physical hosts, bidirectional reachability, Remote CSE registration/forwardi
 ---
 
 **PinchGuard** demonstrates a concrete way to combine **local, event-triggered analytics** with **oneM2M resource semantics and routed monitoring**. Its strongest result is the implemented software pathway and openly published components—not an unverified claim of safety-certified control, multi-host service continuity, or production MEC orchestration.
+
+# Integration-Branch Documentation Migration Checklist
+
+**Target:** `integration/in-cse-dashboard` ONLY. Do **not** merge into `main` merely to use this README.
+
+## Files to copy into the existing branch
+
+- `README.md` — replaces branch root README with the consolidated English guide.
+- `assets/*.jpg` — add three real demonstration screenshots referenced by the new root README.
+- `AI-AE/README.md`, `MN-CSE/README.md`, `IN-CSE/README.md`, `Dashboard/README.md` — concise component-level English guides.
+- `packaging/mec/README.md`, `packaging/monitoring/README.md` — actual package-internal English READMEs used by the corresponding archive builders.
+
+## Important about already-published binaries
+
+Updating the source `packaging/*/README.md` **does not change an already-published `.tar.gz` archive**. To make the package-internal README match this new source, the package must be rebuilt, checksummed and republished as an appropriately versioned release. Avoid silently replacing binary assets under the same tag without a clear release policy.
+
+## Existing docs/ directory
+
+The new root README consolidates the project-wide architecture, configuration, release installation, source development, verification, evaluation evidence and interview talking points. **Do not delete `docs/` until references in source scripts and other Markdown files have been checked.** Keeping it temporarily does not break the new root README.
+
+Inspect the branch and references before cleanup:
+
+```bash
+git switch integration/in-cse-dashboard
+git status --short
+git grep -n 'docs/' -- '*.md' '*.py' '*.sh'
+git diff --check
+git diff --stat
+```
+
+Delete legacy docs only after intentionally migrating any remaining internal links and verifying the unique material is already retained. Do not remove source, DB seeds, build artifacts or local runtime data as part of documentation cleanup.
+
+## Apply and push ONLY the integration branch
+
+After reviewing changes in the local repository, from the project root:
+
+```bash
+git switch integration/in-cse-dashboard
+git add README.md assets/ AI-AE/README.md MN-CSE/README.md IN-CSE/README.md Dashboard/README.md packaging/mec/README.md packaging/monitoring/README.md
+git diff --cached --check
+git diff --cached --stat
+git commit -m "docs: consolidate PinchGuard integration and release guides"
+git push origin integration/in-cse-dashboard
+```
+
+If the branch is already checked out and has uncommitted changes, inspect them first; do not override or discard work. This workflow pushes the integration branch itself, **not `main`**.
+
+## Source review boundary
+
+The document is based on GitHub `integration/in-cse-dashboard`, matched to the tag `v0.1.0-hackathon`, and source review of the main application, remote routing, dashboard polling and both package builders. Large release archives were not downloaded or tested again; the existing release notes specify single-WSL/loopback integration and no verified physical two-computer LAN.
