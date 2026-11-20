@@ -22,7 +22,7 @@ The project has **two separately deployable nodes**:
 | **Computer A — MEC-oriented node** | FastAPI **AI-AE** + modified **TinyIoT MN-CSE** | Validate sensor measurements, conditionally infer risk, update oneM2M FlexContainers, and optionally send a simulated PLC STOP |
 | **Computer B — Monitoring node** | **TinyIoT IN-CSE** + **PinchGuard Dashboard** | Accept remote-CSE registration, route oneM2M read requests to the MN-CSE, poll six device resources, and display telemetry, status, and events |
 
-The source for **all four primary components** is present on the [`integration/in-cse-dashboard` branch](https://github.com/seungwon20/oneM2M-project/tree/integration/in-cse-dashboard). The two Linux x86_64 binary archives and their SHA-256 files are published in [release `v0.1.0-hackathon`](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon); the release tag identifies the archive build revision, while this integration branch has since received documentation updates. **Editing the current branch does not alter the already-published `.tar.gz` files.**
+The source for **all four primary components** is present on the [`integration/in-cse-dashboard` branch](https://github.com/seungwon20/oneM2M-project/tree/main/in-cse-dashboard). The two Linux x86_64 binary archives and their SHA-256 files are published in [release `v0.1.0-hackathon`](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon); the release tag identifies the archive build revision, while this integration branch has since received documentation updates. **Editing the current branch does not alter the already-published `.tar.gz` files.**
 
 The term **MEC-oriented** refers to the placement of analytics close to the CSE on an edge node. This code does **not** establish operational ETSI MEC platform service registration, orchestration, or safety-certified equipment control.
 
@@ -570,7 +570,7 @@ The prior project documentation records **22 passing AI-AE tests** and **27 pass
 | AI-AE, trained demo model, Device1–6 updates | **Implemented in source**, covered by local tests and earlier WSL verification |
 | Modified MN-CSE, SDT / FlexContainer SQLite store | **Implemented in source**, earlier local integration evidence |
 | IN-CSE Remote CSE registration / forwarding | **Implemented in source** (including MN-CSE retry worker); separate-computer success not proven |
-| Dashboard source and IN-CSE polling | **Implemented in this integration branch**, tested with mocked requests; earlier release notes also report single-WSL joint exercise |
+| Dashboard source and IN-CSE polling | **Implemented in this main branch**, tested with mocked requests; earlier release notes also report single-WSL joint exercise |
 | MEC and Monitoring standalone packages | **Published**, each with checksum and builder in repository |
 | Clean independent Linux installation, reboot/upgrade testing | **Not independently validated** in this documentation review |
 | Separate Computer A ↔ Computer B LAN/firewall experiment | **Not validated** by the published release notes |
@@ -656,7 +656,7 @@ Two physical hosts, bidirectional reachability, Remote CSE registration/forwardi
 
 ## References
 
-- [GitHub integration branch](https://github.com/seungwon20/oneM2M-project/tree/integration/in-cse-dashboard)
+- [GitHub integration branch](https://github.com/seungwon20/oneM2M-project/tree/main/in-cse-dashboard)
 - [Published release `v0.1.0-hackathon`](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon)
 - [oneM2M official website](https://www.onem2m.org/)
 - [oneM2M specifications](https://www.onem2m.org/standards)
