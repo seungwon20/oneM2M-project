@@ -523,7 +523,7 @@ The GitHub branch may contain development documentation that post-dates release 
 
 ## Dashboard functionality and APIs
 
-The [Dashboard backend](Dashboard/app.py) (see the [component README](Dashboard/README.md)) provides a web UI, a local SQLite event store, optional API-key-protected ingestion paths, simulated camera/frame support, event acknowledgement, live/demo display modes, and a background IN-CSE polling worker.
+The [Dashboard backend](Dashboard/app.py) provides a web UI, a local SQLite event store, optional API-key-protected ingestion paths, simulated camera/frame support, event acknowledgement, live/demo display modes, and a background IN-CSE polling worker.
 
 | HTTP endpoint | Purpose |
 |:--|:--|
