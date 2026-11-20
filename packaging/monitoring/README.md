@@ -1,9 +1,9 @@
 # PinchGuard Monitoring Package — Computer B
 
 **Linux x86_64 · TinyIoT IN-CSE + PinchGuard Dashboard**  
-[Project overview and two-node installation](https://github.com/seungwon20/oneM2M-project/blob/integration/in-cse-dashboard/README.md) · [Release downloads](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon)
+[Project overview and two-node installation](https://github.com/seungwon20/oneM2M-project/blob/main/in-cse-dashboard/README.md) · [Release downloads](https://github.com/seungwon20/oneM2M-project/releases/tag/v0.1.0-hackathon)
 
-This README is copied into the Monitoring package by [the source package builder](https://github.com/seungwon20/oneM2M-project/blob/integration/in-cse-dashboard/packaging/monitoring/build_package.py). The bundle contains the native TinyIoT IN-CSE, the packaged Dashboard backend/frontend, configuration metadata, and command-line service control. **Computer A must run the companion MEC package**; this archive does not include an MN-CSE.
+This README is copied into the Monitoring package by [the source package builder](https://github.com/seungwon20/oneM2M-project//blob/main/in-cse-dashboard/packaging/monitoring/build_package.py). The bundle contains the native TinyIoT IN-CSE, the packaged Dashboard backend/frontend, configuration metadata, and command-line service control. **Computer A must run the companion MEC package**; this archive does not include an MN-CSE.
 
 ## Package layout
 
